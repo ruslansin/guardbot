@@ -8,6 +8,7 @@ import com.github.snqlby.tgwebhook.methods.JoinReason;
 import com.github.snqlby.tgwebhook.methods.LeaveMethod;
 import com.github.snqlby.tgwebhook.methods.LeaveReason;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,8 +20,12 @@ import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.DeleteMessage;
 import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.User;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboard;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 import org.telegram.telegrambots.meta.bots.AbsSender;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
+import org.telegram.telegrambots.meta.exceptions.TelegramApiValidationException;
 
 @AcceptTypes
 @Component
@@ -41,7 +46,23 @@ public class JoinLeftHandler {
       reason = {JoinReason.SELF}
   )
   public BotApiMethod onUserJoinedSelf(AbsSender bot, Message message, JoinReason reason) {
-    return new SendMessage(WORLD_GROUP_ID, "join message").enableMarkdown(true);
+    var user = findJoinedUsers(reason, message);
+
+    List<List<InlineKeyboardButton>> keyboard = new ArrayList<>();
+    for (int i = 0; i < 5; i++) {
+      List<InlineKeyboardButton> row = new ArrayList<>();
+      for (int j = 0; j < 5; j++) {
+        InlineKeyboardButton button = new InlineKeyboardButton();
+        String id = String.valueOf(j);
+        button.setText(id).setCallbackData(id);
+        row.add(button);
+      }
+      keyboard.add(row);
+    }
+
+    return new SendMessage(WORLD_GROUP_ID, "join message")
+        .setReplyMarkup(new InlineKeyboardMarkup().setKeyboard(keyboard))
+        .setReplyToMessageId(message.getMessageId()).enableMarkdown(true);
   }
 
   private List<org.telegram.telegrambots.meta.api.objects.User> findJoinedUsers(

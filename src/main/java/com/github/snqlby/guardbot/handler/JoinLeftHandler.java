@@ -84,7 +84,7 @@ public class JoinLeftHandler {
   private SendMessage createPuzzleButton(String message, Integer messageId) {
     return new SendMessage(WORLD_GROUP_ID, message)
         .setReplyMarkup(new InlineKeyboardMarkup().setKeyboard(generatePuzzle(randomMinMax(3, 6))))
-        .setReplyToMessageId(messageId).enableMarkdown(true);
+        .setReplyToMessageId(messageId).disableNotification().enableMarkdown(true);
   }
 
   private EditMessageText updatePuzzleButton(String replyMessage, Long chatId, Integer messageId) {

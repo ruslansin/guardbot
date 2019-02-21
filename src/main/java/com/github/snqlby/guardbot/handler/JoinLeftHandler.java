@@ -97,8 +97,8 @@ public class JoinLeftHandler {
   }
 
   private List<List<InlineKeyboardButton>> generatePuzzle(int size) {
-    int xExit = randomMinMax(0, size);
-    int yExit = randomMinMax(0, size);
+    int xExit = randomMinMax(0, size - 1);
+    int yExit = randomMinMax(0, size - 1);
     List<List<InlineKeyboardButton>> keyboard = new ArrayList<>();
     for (int x = 0; x < size; x++) {
       List<InlineKeyboardButton> row = new ArrayList<>();

@@ -60,21 +60,21 @@ public class JoinLeftHandler {
     muteUser(bot, userId);
 
     Integer joinMessageId = message.getMessageId();
-    SendMessage puzzleMessage = generatePuzzleMessage(user, joinMessageId);
+    SendMessage puzzleMessage = generatePuzzleMessage(user.getFirstName(), joinMessageId);
     Integer puzzleMessageId;
     try {
       puzzleMessageId = bot.execute(puzzleMessage).getMessageId();
-      activePuzzles.put(userId, new ActivePuzzle(joinMessageId, puzzleMessageId));
+      activePuzzles.put(userId, new ActivePuzzle(joinMessageId, puzzleMessageId, user.getFirstName()));
     } catch (TelegramApiException e) {
       LOG.error("Cannot send puzzle to user {}", userId);
     }
     return null;
   }
 
-  private SendMessage generatePuzzleMessage(User user, Integer messageId) {
+  private SendMessage generatePuzzleMessage(String firstName, Integer messageId) {
     String replyMessage = String
         .format("Hello, %s. Let us make sure you are not a bot. **Find the Portal (\uD83C\uDF00)**",
-            user.getFirstName());
+            firstName);
     return new SendMessage(WORLD_GROUP_ID, replyMessage)
         .setReplyMarkup(new InlineKeyboardMarkup().setKeyboard(generatePuzzle(randomMinMax(3, 6))))
         .setReplyToMessageId(messageId).enableMarkdown(true);
@@ -142,6 +142,11 @@ public class JoinLeftHandler {
     Integer userId = query.getFrom().getId();
     if (!hasAccess(userId, query.getMessage().getMessageId())) {
       return accessDeniedMessage(userId.longValue());
+    }
+
+    if (randomMinMax(1, 4) > 1) {
+      ActivePuzzle puzzle = activePuzzles.get(userId);
+      return generatePuzzleMessage(puzzle.getFirstName(), puzzle.getPuzzleMessageId());
     }
 
     removeMessages(bot, activePuzzles.get(userId));

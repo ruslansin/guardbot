@@ -21,6 +21,7 @@ import java.util.concurrent.ThreadLocalRandom;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
+import org.telegram.telegrambots.meta.api.methods.AnswerCallbackQuery;
 import org.telegram.telegrambots.meta.api.methods.BotApiMethod;
 import org.telegram.telegrambots.meta.api.methods.groupadministration.KickChatMember;
 import org.telegram.telegrambots.meta.api.methods.groupadministration.RestrictChatMember;
@@ -129,11 +130,11 @@ public class JoinLeftHandler {
   public BotApiMethod onBanMe(AbsSender bot, CallbackQuery query, CallbackOrigin origin) {
     Integer userId = query.getFrom().getId();
     if (!activePuzzles.containsKey(userId)) {
-      return accessDeniedMessage(userId.longValue());
+      return accessDeniedMessage(query.getId());
     } else {
       ActivePuzzle puzzle = activePuzzles.get(userId);
       if (!puzzle.getPuzzleMessageId().equals(query.getMessage().getMessageId())) {
-        return accessDeniedMessage(userId.longValue());
+        return accessDeniedMessage(query.getId());
       }
     }
 
@@ -144,16 +145,15 @@ public class JoinLeftHandler {
     return null;
   }
 
-  private BotApiMethod accessDeniedMessage(Long userId) {
-    return new SendMessage(userId, "It's Not Your Fight any More")
-        .enableNotification();
+  private BotApiMethod accessDeniedMessage(String queryId) {
+    return new AnswerCallbackQuery().setCallbackQueryId(queryId).setText("It's Not Your Fight any More");
   }
 
   @CallbackMethod(data = "solve", origin = CallbackOrigin.MESSAGE, locality = Locality.SUPERGROUP)
   public BotApiMethod onSolve(AbsSender bot, CallbackQuery query, CallbackOrigin origin) {
     Integer userId = query.getFrom().getId();
     if (!hasAccess(userId, query.getMessage().getMessageId())) {
-      return accessDeniedMessage(userId.longValue());
+      return accessDeniedMessage(query.getId());
     }
 
     if (randomMinMax(1, 4) > 1) {

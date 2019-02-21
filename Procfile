@@ -1,0 +1,1 @@
+web: java -agentlib:jdwp=transport=dt_socket,server=y,address=9090,suspend=n $SESSION_PROPERTIES -Dserver.port=$PORT -Dtelegram.token=$TELEGRAM_TOKEN -Dtelegram.username=$TELEGRAM_USERNAME -Dtelegram.url=$TELEGRAM_URL $JAVA_OPTS -jar build/libs/*.jar

@@ -34,7 +34,7 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKe
 import org.telegram.telegrambots.meta.bots.AbsSender;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
-@AcceptTypes({UpdateType.CALLBACK_QUERY, UpdateType.MESSAGE})
+@AcceptTypes({UpdateType.MESSAGE, UpdateType.CALLBACK_QUERY})
 @Component
 public class JoinLeftHandler {
 
@@ -71,7 +71,7 @@ public class JoinLeftHandler {
         String buttonIdentifier;
         String buttonText;
         if (x == xExit && y == yExit) {
-          buttonText = "🚪🚪🌀\uD83C\uDF00";
+          buttonText = "\uD83C\uDF00";
           buttonIdentifier = "solve";
         } else {
           buttonText = "💣";
@@ -106,7 +106,7 @@ public class JoinLeftHandler {
     return random.nextInt(bound + 1);
   }
 
-  @CallbackMethod(data = "banme", origin = CallbackOrigin.MESSAGE, locality = Locality.GROUP)
+  @CallbackMethod(data = "banme", origin = CallbackOrigin.MESSAGE, locality = Locality.SUPERGROUP)
   public BotApiMethod onBanMe(AbsSender bot, CallbackQuery query, CallbackOrigin origin) {
     Integer userId = query.getFrom().getId();
     if (!activePuzzles.containsKey(userId)) {
@@ -130,7 +130,7 @@ public class JoinLeftHandler {
         .enableNotification();
   }
 
-  @CallbackMethod(data = "solve", origin = CallbackOrigin.MESSAGE, locality = Locality.GROUP)
+  @CallbackMethod(data = "solve", origin = CallbackOrigin.MESSAGE, locality = Locality.SUPERGROUP)
   public BotApiMethod onSolve(AbsSender bot, CallbackQuery query, CallbackOrigin origin) {
     Integer userId = query.getFrom().getId();
     if (!hasAccess(userId, query.getMessage().getMessageId())) {

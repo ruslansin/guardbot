@@ -26,6 +26,7 @@ import org.telegram.telegrambots.meta.api.methods.groupadministration.KickChatMe
 import org.telegram.telegrambots.meta.api.methods.groupadministration.RestrictChatMember;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.DeleteMessage;
+import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText;
 import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
 import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.User;
@@ -60,24 +61,35 @@ public class JoinLeftHandler {
     muteUser(bot, userId);
 
     Integer joinMessageId = message.getMessageId();
-    SendMessage puzzleMessage = generatePuzzleMessage(user.getFirstName(), joinMessageId);
+    SendMessage puzzleMessage = createPuzzleButton(
+        generatePuzzleMessage(user.getFirstName()), joinMessageId);
     Integer puzzleMessageId;
     try {
       puzzleMessageId = bot.execute(puzzleMessage).getMessageId();
-      activePuzzles.put(userId, new ActivePuzzle(joinMessageId, puzzleMessageId, user.getFirstName()));
+      activePuzzles
+          .put(userId, new ActivePuzzle(joinMessageId, puzzleMessageId, user.getFirstName()));
     } catch (TelegramApiException e) {
       LOG.error("Cannot send puzzle to user {}", userId);
     }
     return null;
   }
 
-  private SendMessage generatePuzzleMessage(String firstName, Integer messageId) {
-    String replyMessage = String
+  private String generatePuzzleMessage(String firstName) {
+    return String
         .format("Hello, %s. Let us make sure you are not a bot. **Find the Portal (\uD83C\uDF00)**",
             firstName);
-    return new SendMessage(WORLD_GROUP_ID, replyMessage)
+  }
+
+  private SendMessage createPuzzleButton(String message, Integer messageId) {
+    return new SendMessage(WORLD_GROUP_ID, message)
         .setReplyMarkup(new InlineKeyboardMarkup().setKeyboard(generatePuzzle(randomMinMax(3, 6))))
         .setReplyToMessageId(messageId).enableMarkdown(true);
+  }
+
+  private EditMessageText updatePuzzleButton(String replyMessage, Long chatId, Integer messageId) {
+    return new EditMessageText().setText(replyMessage).setChatId(chatId).setMessageId(messageId)
+        .setReplyMarkup(new InlineKeyboardMarkup().setKeyboard(generatePuzzle(randomMinMax(3, 6))))
+        .enableMarkdown(true);
   }
 
   private int randomMinMax(int min, int max) {
@@ -146,7 +158,8 @@ public class JoinLeftHandler {
 
     if (randomMinMax(1, 4) > 1) {
       ActivePuzzle puzzle = activePuzzles.get(userId);
-      return generatePuzzleMessage(puzzle.getFirstName(), puzzle.getPuzzleMessageId());
+      return updatePuzzleButton(generatePuzzleMessage(puzzle.getFirstName()), WORLD_GROUP_ID,
+          puzzle.getPuzzleMessageId());
     }
 
     removeMessages(bot, activePuzzles.get(userId));

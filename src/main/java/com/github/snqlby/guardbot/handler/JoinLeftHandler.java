@@ -86,7 +86,7 @@ public class JoinLeftHandler {
 
     Integer joinMessageId = message.getMessageId();
     String replyMessage = String
-        .format("Hello, %s. Let us make sure you are not a bot. **Find the Portal**",
+        .format("Hello, %s. Let us make sure you are not a bot. **Find the Portal (\uD83C\uDF00)**",
             user.getFirstName());
     SendMessage puzzleMessage = new SendMessage(WORLD_GROUP_ID, replyMessage)
         .setReplyMarkup(new InlineKeyboardMarkup().setKeyboard(keyboard))
@@ -103,7 +103,7 @@ public class JoinLeftHandler {
   }
 
   private int findExitPosition(int bound, Random random) {
-    return random.nextInt(bound + 1);
+    return random.nextInt(bound);
   }
 
   @CallbackMethod(data = "banme", origin = CallbackOrigin.MESSAGE, locality = Locality.SUPERGROUP)

@@ -11,13 +11,13 @@ import com.github.snqlby.tgwebhook.methods.JoinMethod;
 import com.github.snqlby.tgwebhook.methods.JoinReason;
 import com.github.snqlby.tgwebhook.methods.LeaveMethod;
 import com.github.snqlby.tgwebhook.methods.LeaveReason;
-import java.security.SecureRandom;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ThreadLocalRandom;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -39,7 +39,7 @@ import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 public class JoinLeftHandler {
 
   private static final Logger LOG = LoggerFactory.getLogger(JoinLeftHandler.class);
-  private Map<Integer, List<Integer>> activePuzzles = new ConcurrentHashMap<>();
+  private Map<Integer, ActivePuzzle> activePuzzles = new ConcurrentHashMap<>();
 
   /**
    * Process an event when user has joined the group.
@@ -59,10 +59,34 @@ public class JoinLeftHandler {
     Integer userId = user.getId();
     muteUser(bot, userId);
 
-    int size = 4;
-    SecureRandom random = new SecureRandom();
-    int xExit = findExitPosition(size, random);
-    int yExit = findExitPosition(size, random);
+    Integer joinMessageId = message.getMessageId();
+    SendMessage puzzleMessage = generatePuzzleMessage(user, joinMessageId);
+    Integer puzzleMessageId;
+    try {
+      puzzleMessageId = bot.execute(puzzleMessage).getMessageId();
+      activePuzzles.put(userId, new ActivePuzzle(joinMessageId, puzzleMessageId));
+    } catch (TelegramApiException e) {
+      LOG.error("Cannot send puzzle to user {}", userId);
+    }
+    return null;
+  }
+
+  private SendMessage generatePuzzleMessage(User user, Integer messageId) {
+    String replyMessage = String
+        .format("Hello, %s. Let us make sure you are not a bot. **Find the Portal (\uD83C\uDF00)**",
+            user.getFirstName());
+    return new SendMessage(WORLD_GROUP_ID, replyMessage)
+        .setReplyMarkup(new InlineKeyboardMarkup().setKeyboard(generatePuzzle(randomMinMax(3, 6))))
+        .setReplyToMessageId(messageId).enableMarkdown(true);
+  }
+
+  private int randomMinMax(int min, int max) {
+    return ThreadLocalRandom.current().nextInt(min, max + 1);
+  }
+
+  private List<List<InlineKeyboardButton>> generatePuzzle(int size) {
+    int xExit = randomMinMax(0, size);
+    int yExit = randomMinMax(0, size);
     List<List<InlineKeyboardButton>> keyboard = new ArrayList<>();
     for (int x = 0; x < size; x++) {
       List<InlineKeyboardButton> row = new ArrayList<>();
@@ -82,24 +106,7 @@ public class JoinLeftHandler {
       }
       keyboard.add(row);
     }
-
-
-    Integer joinMessageId = message.getMessageId();
-    String replyMessage = String
-        .format("Hello, %s. Let us make sure you are not a bot. **Find the Portal (\uD83C\uDF00)**",
-            user.getFirstName());
-    SendMessage puzzleMessage = new SendMessage(WORLD_GROUP_ID, replyMessage)
-        .setReplyMarkup(new InlineKeyboardMarkup().setKeyboard(keyboard))
-        .setReplyToMessageId(joinMessageId).enableMarkdown(true);
-
-    Integer puzzleMessageId;
-    try {
-      puzzleMessageId = bot.execute(puzzleMessage).getMessageId();
-      activePuzzles.put(userId, List.of(joinMessageId, puzzleMessageId));
-    } catch (TelegramApiException e) {
-      LOG.error("Cannot send puzzle to user {}", userId);
-    }
-    return null;
+    return keyboard;
   }
 
   private int findExitPosition(int bound, Random random) {
@@ -112,8 +119,8 @@ public class JoinLeftHandler {
     if (!activePuzzles.containsKey(userId)) {
       return accessDeniedMessage(userId.longValue());
     } else {
-      List<Integer> messages = activePuzzles.get(userId);
-      if (!messages.contains(query.getMessage().getMessageId())) {
+      ActivePuzzle puzzle = activePuzzles.get(userId);
+      if (!puzzle.getPuzzleMessageId().equals(query.getMessage().getMessageId())) {
         return accessDeniedMessage(userId.longValue());
       }
     }
@@ -147,8 +154,8 @@ public class JoinLeftHandler {
     if (!activePuzzles.containsKey(userId)) {
       return false;
     } else {
-      List<Integer> messages = activePuzzles.get(userId);
-      return messages.contains(messageId);
+      ActivePuzzle puzzle = activePuzzles.get(userId);
+      return puzzle.getPuzzleMessageId().equals(messageId);
     }
   }
 
@@ -184,13 +191,12 @@ public class JoinLeftHandler {
     return null;
   }
 
-  private void removeMessages(AbsSender bot, List<Integer> messageIds) {
+  private void removeMessages(AbsSender bot, ActivePuzzle puzzle) {
     try {
-      for (Integer messageId : messageIds) {
-        bot.execute(deleteMessage(WORLD_GROUP_ID, messageId));
-      }
+      bot.execute(deleteMessage(WORLD_GROUP_ID, puzzle.getJoinMessageId()));
+      bot.execute(deleteMessage(WORLD_GROUP_ID, puzzle.getPuzzleMessageId()));
     } catch (TelegramApiException e) {
-      LOG.warn("Cannot remove a message: {}. {}", messageIds, e.getMessage());
+      LOG.warn("Cannot remove a message: {}. {}", puzzle, e.getMessage());
     }
   }
 

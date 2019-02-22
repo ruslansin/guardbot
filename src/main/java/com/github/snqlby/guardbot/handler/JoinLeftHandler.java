@@ -1,7 +1,5 @@
 package com.github.snqlby.guardbot.handler;
 
-import static com.github.snqlby.guardbot.util.Constants.WORLD_GROUP_ID;
-
 import com.github.snqlby.guardbot.puzzle.Puzzle;
 import com.github.snqlby.tgwebhook.AcceptTypes;
 import com.github.snqlby.tgwebhook.Locality;
@@ -54,7 +52,6 @@ public class JoinLeftHandler {
    * @return null if user doesn't exists
    */
   @JoinMethod(
-      room = WORLD_GROUP_ID,
       reason = {JoinReason.SELF}
   )
   public BotApiMethod onUserJoinedSelf(AbsSender bot, Message message, JoinReason reason) {
@@ -81,7 +78,11 @@ public class JoinLeftHandler {
     return null;
   }
 
-  @CallbackMethod(data = "banme", origin = CallbackOrigin.MESSAGE, locality = Locality.SUPERGROUP)
+  @CallbackMethod(
+      data = "banme",
+      origin = CallbackOrigin.MESSAGE,
+      locality = {Locality.GROUP, Locality.SUPERGROUP}
+  )
   public BotApiMethod onBanMe(AbsSender bot, CallbackQuery query, CallbackOrigin origin) {
     Integer userId = query.getFrom().getId();
     Long chatId = query.getMessage().getChatId();
@@ -100,7 +101,11 @@ public class JoinLeftHandler {
     return null;
   }
 
-  @CallbackMethod(data = "solve", origin = CallbackOrigin.MESSAGE, locality = Locality.SUPERGROUP)
+  @CallbackMethod(
+      data = "solve",
+      origin = CallbackOrigin.MESSAGE,
+      locality = {Locality.GROUP, Locality.SUPERGROUP}
+  )
   public BotApiMethod onSolve(AbsSender bot, CallbackQuery query, CallbackOrigin origin) {
     Integer userId = query.getFrom().getId();
     Long chatId = query.getMessage().getChatId();
@@ -154,7 +159,6 @@ public class JoinLeftHandler {
    * requests), RestrictChatMember instance otherwise
    */
   @LeaveMethod(
-      room = WORLD_GROUP_ID,
       reason = {LeaveReason.KICK, LeaveReason.SELF}
   )
   public BotApiMethod onUserLeft(AbsSender bot, Message message, LeaveReason reason) {

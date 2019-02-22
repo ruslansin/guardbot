@@ -4,10 +4,12 @@ public class ActivePuzzle {
 
   private Integer joinMessageId;
   private Integer puzzleMessageId;
+  private final Thread puzzleThread;
 
-  public ActivePuzzle(Integer joinMessageId, Integer puzzleMessageId) {
+  public ActivePuzzle(Integer joinMessageId, Integer puzzleMessageId, Thread puzzleThread) {
     this.joinMessageId = joinMessageId;
     this.puzzleMessageId = puzzleMessageId;
+    this.puzzleThread = puzzleThread;
   }
 
   public Integer getJoinMessageId() {
@@ -24,6 +26,10 @@ public class ActivePuzzle {
 
   public void setPuzzleMessageId(Integer puzzleMessageId) {
     this.puzzleMessageId = puzzleMessageId;
+  }
+
+  public Thread getPuzzleThread() {
+    return puzzleThread;
   }
 
   @Override

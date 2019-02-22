@@ -1,5 +1,9 @@
 package com.github.snqlby.guardbot.handler;
 
+import static com.github.snqlby.guardbot.util.Constants.PUZZLE_AUTOFAIL_TIME;
+import static com.github.snqlby.guardbot.util.Constants.PUZZLE_BAN_TIME;
+import static com.github.snqlby.guardbot.util.Constants.PUZZLE_CHALLENGE_TIME;
+
 import com.github.snqlby.guardbot.puzzle.Puzzle;
 import com.github.snqlby.tgwebhook.AcceptTypes;
 import com.github.snqlby.tgwebhook.Locality;
@@ -58,20 +62,39 @@ public class JoinLeftHandler {
     var users = findJoinedUsers(reason, message);
     User user = users.get(0);
     Integer userId = user.getId();
-    muteUser(bot, message.getChatId(), userId);
+    Long chatId = message.getChatId();
+    muteUser(bot, chatId, userId);
 
     Integer joinMessageId = message.getMessageId();
     SendMessage puzzleMessage = (SendMessage) puzzle.nextPuzzle(message);
     puzzleMessage
-        .setChatId(message.getChatId())
+        .setChatId(chatId)
         .setReplyToMessageId(joinMessageId)
         .enableMarkdown(true)
         .disableNotification();
     Integer puzzleMessageId;
     try {
       puzzleMessageId = bot.execute(puzzleMessage).getMessageId();
-      activePuzzles.put(key(message.getChatId(), userId),
-          new ActivePuzzle(joinMessageId, puzzleMessageId));
+      String key = key(chatId, userId);
+      Thread puzzleThread = new Thread(() -> {
+        try {
+          Thread.sleep(PUZZLE_CHALLENGE_TIME * 1000);
+        } catch (InterruptedException e) {
+          LOG.debug("Task has been interrupted: {}", key);
+          return;
+        }
+
+        if (activePuzzles.containsKey(key)) {
+          LOG.debug("Time to solve the puzzle is out: {}", key);
+          ActivePuzzle puzzle = activePuzzles.get(key);
+          kickUser(bot, chatId, userId, PUZZLE_AUTOFAIL_TIME);
+          removeMessages(bot, chatId, puzzle);
+          activePuzzles.remove(key);
+        }
+
+      });
+      activePuzzles.put(key, new ActivePuzzle(joinMessageId, puzzleMessageId, puzzleThread));
+      puzzleThread.start();
     } catch (TelegramApiException e) {
       LOG.error("Cannot send puzzle to user {}", userId);
     }
@@ -90,11 +113,12 @@ public class JoinLeftHandler {
       return accessDeniedMessage(query.getId());
     }
 
-    LOG.info("Captcha hasn't been resolved by {}", userId);
+    LOG.info("Captcha hasn't been solved by {}", userId);
 
     String key = key(chatId, userId);
     ActivePuzzle info = activePuzzles.get(key);
-    kickUser(bot, query.getMessage().getChatId(), userId);
+    info.getPuzzleThread().interrupt();
+    kickUser(bot, query.getMessage().getChatId(), userId, PUZZLE_BAN_TIME);
     removeMessages(bot, chatId, info);
     activePuzzles.remove(key);
 
@@ -127,10 +151,12 @@ public class JoinLeftHandler {
       }
     }
 
-    LOG.info("Captcha has been resolved by {}", userId);
+    LOG.info("Captcha has been solved by {}", userId);
 
     String key = key(chatId, userId);
-    removeMessages(bot, chatId, activePuzzles.get(key));
+    ActivePuzzle info = activePuzzles.get(key);
+    info.getPuzzleThread().interrupt();
+    removeMessages(bot, chatId, info);
     activePuzzles.remove(key);
 
     return unmuteUser(chatId, userId);
@@ -173,7 +199,9 @@ public class JoinLeftHandler {
 
     String key = key(message.getChatId(), userId);
     if (activePuzzles.containsKey(key)) {
-      removeMessages(bot, message.getChatId(), activePuzzles.get(key));
+      ActivePuzzle info = activePuzzles.get(key);
+      info.getPuzzleThread().interrupt();
+      removeMessages(bot, message.getChatId(), info);
       activePuzzles.remove(key);
     }
 
@@ -216,12 +244,12 @@ public class JoinLeftHandler {
     return deleteMessage(message.getChatId(), message.getMessageId());
   }
 
-  private boolean kickUser(AbsSender bot, long chatId, int userId) {
-    final int banDuration = 60;
+  private boolean kickUser(AbsSender bot, long chatId, int userId, int duration) {
+    LOG.debug("Kicking user {} for {} seconds from {}", userId, duration, chatId);
     try {
       bot.execute(
           new KickChatMember(chatId, userId)
-              .forTimePeriod(Duration.ofSeconds(banDuration)));
+              .forTimePeriod(Duration.ofSeconds(duration)));
     } catch (TelegramApiException e) {
       LOG.error("Cannot execute KickChatMember method: {}", e.getMessage());
       return false;

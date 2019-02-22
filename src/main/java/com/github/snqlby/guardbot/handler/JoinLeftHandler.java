@@ -5,6 +5,7 @@ import static com.github.snqlby.guardbot.util.Constants.PUZZLE_BAN_TIME;
 import static com.github.snqlby.guardbot.util.Constants.PUZZLE_CHALLENGE_TIME;
 
 import com.github.snqlby.guardbot.puzzle.Puzzle;
+import com.github.snqlby.guardbot.util.Bot;
 import com.github.snqlby.tgwebhook.AcceptTypes;
 import com.github.snqlby.tgwebhook.Locality;
 import com.github.snqlby.tgwebhook.UpdateType;
@@ -14,19 +15,13 @@ import com.github.snqlby.tgwebhook.methods.JoinMethod;
 import com.github.snqlby.tgwebhook.methods.JoinReason;
 import com.github.snqlby.tgwebhook.methods.LeaveMethod;
 import com.github.snqlby.tgwebhook.methods.LeaveReason;
-import java.time.Duration;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
-import org.telegram.telegrambots.meta.api.methods.AnswerCallbackQuery;
 import org.telegram.telegrambots.meta.api.methods.BotApiMethod;
-import org.telegram.telegrambots.meta.api.methods.groupadministration.KickChatMember;
-import org.telegram.telegrambots.meta.api.methods.groupadministration.RestrictChatMember;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
-import org.telegram.telegrambots.meta.api.methods.updatingmessages.DeleteMessage;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText;
 import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
 import org.telegram.telegrambots.meta.api.objects.Message;
@@ -58,12 +53,11 @@ public class JoinLeftHandler {
   @JoinMethod(
       reason = {JoinReason.SELF}
   )
-  public BotApiMethod onUserJoinedSelf(AbsSender bot, Message message, JoinReason reason) {
-    var users = findJoinedUsers(reason, message);
-    User user = users.get(0);
+  public BotApiMethod onUserJoined(AbsSender bot, Message message, JoinReason reason) {
+    User user = message.getFrom();
     Integer userId = user.getId();
     Long chatId = message.getChatId();
-    muteUser(bot, chatId, userId);
+    Bot.muteUser(bot, chatId, userId);
 
     Integer joinMessageId = message.getMessageId();
     SendMessage puzzleMessage = (SendMessage) puzzle.nextPuzzle(message);
@@ -87,11 +81,10 @@ public class JoinLeftHandler {
         if (activePuzzles.containsKey(key)) {
           LOG.debug("Time to solve the puzzle is out: {}", key);
           ActivePuzzle puzzle = activePuzzles.get(key);
-          kickUser(bot, chatId, userId, PUZZLE_AUTOFAIL_TIME);
+          Bot.kickUser(bot, chatId, userId, PUZZLE_AUTOFAIL_TIME);
           removeMessages(bot, chatId, puzzle);
           activePuzzles.remove(key);
         }
-
       });
       activePuzzles.put(key, new ActivePuzzle(joinMessageId, puzzleMessageId, puzzleThread));
       puzzleThread.start();
@@ -118,7 +111,7 @@ public class JoinLeftHandler {
     String key = key(chatId, userId);
     ActivePuzzle info = activePuzzles.get(key);
     info.getPuzzleThread().interrupt();
-    kickUser(bot, query.getMessage().getChatId(), userId, PUZZLE_BAN_TIME);
+    Bot.kickUser(bot, query.getMessage().getChatId(), userId, PUZZLE_BAN_TIME);
     removeMessages(bot, chatId, info);
     activePuzzles.remove(key);
 
@@ -133,7 +126,8 @@ public class JoinLeftHandler {
   public BotApiMethod onSolve(AbsSender bot, CallbackQuery query, CallbackOrigin origin) {
     Integer userId = query.getFrom().getId();
     Long chatId = query.getMessage().getChatId();
-    if (!hasAccess(userId, chatId, query.getMessage().getMessageId())) {
+    Integer messageId = query.getMessage().getMessageId();
+    if (!hasAccess(userId, chatId, messageId)) {
       return accessDeniedMessage(query.getId());
     }
 
@@ -142,7 +136,7 @@ public class JoinLeftHandler {
         EditMessageText newChallenge = (EditMessageText) puzzle.nextPuzzle(query);
         newChallenge
             .setChatId(chatId)
-            .setMessageId(query.getMessage().getMessageId())
+            .setMessageId(messageId)
             .enableMarkdown(true);
         bot.execute(newChallenge);
         return successMessage(query.getId());
@@ -159,20 +153,7 @@ public class JoinLeftHandler {
     removeMessages(bot, chatId, info);
     activePuzzles.remove(key);
 
-    return unmuteUser(chatId, userId);
-  }
-
-  private BotApiMethod accessDeniedMessage(String queryId) {
-    return createCallbackMessage(queryId, "It's Not Your Fight Anymore");
-  }
-
-  private BotApiMethod successMessage(String queryId) {
-    return createCallbackMessage(queryId, "Well Done");
-  }
-
-  private BotApiMethod createCallbackMessage(String queryId, String text) {
-    return new AnswerCallbackQuery().setCallbackQueryId(queryId)
-        .setText(text);
+    return Bot.unmuteUser(chatId, userId);
   }
 
   /**
@@ -192,7 +173,7 @@ public class JoinLeftHandler {
     int userId = reason == LeaveReason.SELF ? message.getFrom().getId() : firstUser.getId();
 
     try {
-      bot.execute(deleteMessage(message));
+      bot.execute(Bot.deleteMessage(message));
     } catch (TelegramApiException e) {
       LOG.warn("Cannot remove a message: {}. {}", userId, e.getMessage());
     }
@@ -218,61 +199,21 @@ public class JoinLeftHandler {
     }
   }
 
+  private BotApiMethod accessDeniedMessage(String queryId) {
+    return Bot.createCallbackMessage(queryId, "It's Not Your Fight Anymore");
+  }
+
+  private BotApiMethod successMessage(String queryId) {
+    return Bot.createCallbackMessage(queryId, "Well Done");
+  }
+
   private void removeMessages(AbsSender bot, long chatId, ActivePuzzle puzzle) {
     try {
-      bot.execute(deleteMessage(chatId, puzzle.getJoinMessageId()));
-      bot.execute(deleteMessage(chatId, puzzle.getPuzzleMessageId()));
+      bot.execute(Bot.deleteMessage(chatId, puzzle.getJoinMessageId()));
+      bot.execute(Bot.deleteMessage(chatId, puzzle.getPuzzleMessageId()));
     } catch (TelegramApiException e) {
       LOG.warn("Cannot remove a message: {}. {}", puzzle, e.getMessage());
     }
-  }
-
-  private List<org.telegram.telegrambots.meta.api.objects.User> findJoinedUsers(
-      JoinReason reason, Message message) {
-    if (reason == JoinReason.ADD) {
-      return message.getNewChatMembers();
-    } else {
-      return List.of(message.getFrom());
-    }
-  }
-
-  private BotApiMethod<?> deleteMessage(long chatId, int messageId) {
-    return new DeleteMessage(chatId, messageId);
-  }
-
-  private BotApiMethod<?> deleteMessage(Message message) {
-    return deleteMessage(message.getChatId(), message.getMessageId());
-  }
-
-  private boolean kickUser(AbsSender bot, long chatId, int userId, int duration) {
-    LOG.debug("Kicking user {} for {} seconds from {}", userId, duration, chatId);
-    try {
-      bot.execute(
-          new KickChatMember(chatId, userId)
-              .forTimePeriod(Duration.ofSeconds(duration)));
-    } catch (TelegramApiException e) {
-      LOG.error("Cannot execute KickChatMember method: {}", e.getMessage());
-      return false;
-    }
-    return true;
-  }
-
-  private boolean muteUser(AbsSender bot, long groupId, int userId) {
-    try {
-      bot.execute(new RestrictChatMember(groupId, userId).setCanSendMessages(false));
-    } catch (TelegramApiException e) {
-      LOG.error("Cannot execute KickChatMember method: {}", e.getMessage());
-      return false;
-    }
-    return true;
-  }
-
-  private BotApiMethod unmuteUser(long chatId, int userId) {
-    return new RestrictChatMember(chatId, userId)
-        .setCanSendMessages(true)
-        .setCanAddWebPagePreviews(true)
-        .setCanSendMediaMessages(true)
-        .setCanSendOtherMessages(true);
   }
 
   private String key(Long chatId, Integer userId) {

@@ -1,4 +1,4 @@
-package com.github.snqlby.guardbot.handler;
+package com.github.snqlby.guardbot.service;
 
 public class ActivePuzzle {
 

@@ -5,6 +5,8 @@ import static com.github.snqlby.guardbot.util.Constants.PUZZLE_BAN_TIME;
 import static com.github.snqlby.guardbot.util.Constants.PUZZLE_CHALLENGE_TIME;
 
 import com.github.snqlby.guardbot.puzzle.Puzzle;
+import com.github.snqlby.guardbot.service.ActivePuzzle;
+import com.github.snqlby.guardbot.service.SessionService;
 import com.github.snqlby.guardbot.util.Bot;
 import com.github.snqlby.tgwebhook.AcceptTypes;
 import com.github.snqlby.tgwebhook.Locality;
@@ -15,8 +17,6 @@ import com.github.snqlby.tgwebhook.methods.JoinMethod;
 import com.github.snqlby.tgwebhook.methods.JoinReason;
 import com.github.snqlby.tgwebhook.methods.LeaveMethod;
 import com.github.snqlby.tgwebhook.methods.LeaveReason;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -34,11 +34,12 @@ import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 public class JoinLeftHandler {
 
   private static final Logger LOG = LoggerFactory.getLogger(JoinLeftHandler.class);
-  private Map<String, ActivePuzzle> activePuzzles = new ConcurrentHashMap<>();
+  private final SessionService sessionService;
   private Puzzle puzzle;
 
-  public JoinLeftHandler(Puzzle puzzle) {
+  public JoinLeftHandler(Puzzle puzzle, SessionService sessionService) {
     this.puzzle = puzzle;
+    this.sessionService = sessionService;
     puzzle.setComplexity(4);
   }
 
@@ -69,25 +70,22 @@ public class JoinLeftHandler {
     Integer puzzleMessageId;
     try {
       puzzleMessageId = bot.execute(puzzleMessage).getMessageId();
-      String key = key(chatId, userId);
-      Thread puzzleThread = new Thread(() -> {
+      sessionService.create(message, puzzleMessageId, () -> {
         try {
           Thread.sleep(PUZZLE_CHALLENGE_TIME * 1000);
         } catch (InterruptedException e) {
-          LOG.debug("Task has been interrupted: {}", key);
+          LOG.debug("Task has been interrupted: chatId {}, userId {}", chatId, userId);
           return;
         }
 
-        if (activePuzzles.containsKey(key)) {
-          LOG.debug("Time to solve the puzzle is out: {}", key);
-          ActivePuzzle puzzle = activePuzzles.get(key);
+        if (sessionService.isAlive(chatId, userId)) {
+          LOG.debug("Time to solve the puzzle for {}", userId);
+          ActivePuzzle puzzle = sessionService.find(chatId, userId);
           Bot.kickUser(bot, chatId, userId, PUZZLE_AUTOFAIL_TIME);
           removeMessages(bot, chatId, puzzle);
-          activePuzzles.remove(key);
+          sessionService.destroy(chatId, userId);
         }
       });
-      activePuzzles.put(key, new ActivePuzzle(joinMessageId, puzzleMessageId, puzzleThread));
-      puzzleThread.start();
     } catch (TelegramApiException e) {
       LOG.error("Cannot send puzzle to user {}", userId);
     }
@@ -108,12 +106,10 @@ public class JoinLeftHandler {
 
     LOG.info("Captcha hasn't been solved by {}", userId);
 
-    String key = key(chatId, userId);
-    ActivePuzzle info = activePuzzles.get(key);
-    info.getPuzzleThread().interrupt();
+    ActivePuzzle info = sessionService.find(chatId, userId);
     Bot.kickUser(bot, query.getMessage().getChatId(), userId, PUZZLE_BAN_TIME);
     removeMessages(bot, chatId, info);
-    activePuzzles.remove(key);
+    sessionService.destroy(chatId, userId);
 
     return null;
   }
@@ -141,17 +137,15 @@ public class JoinLeftHandler {
         bot.execute(newChallenge);
         return successMessage(query.getId());
       } catch (TelegramApiException e) {
-        LOG.error("Cannot generate a new puzzle, complete it");
+        LOG.error("Cannot generate a new puzzle, complete it: {}", e);
       }
     }
 
     LOG.info("Captcha has been solved by {}", userId);
 
-    String key = key(chatId, userId);
-    ActivePuzzle info = activePuzzles.get(key);
-    info.getPuzzleThread().interrupt();
+    ActivePuzzle info = sessionService.find(chatId, userId);
     removeMessages(bot, chatId, info);
-    activePuzzles.remove(key);
+    sessionService.destroy(chatId, userId);
 
     return Bot.unmuteUser(chatId, userId);
   }
@@ -171,6 +165,7 @@ public class JoinLeftHandler {
   public BotApiMethod onUserLeft(AbsSender bot, Message message, LeaveReason reason) {
     User firstUser = message.getLeftChatMember();
     int userId = reason == LeaveReason.SELF ? message.getFrom().getId() : firstUser.getId();
+    long chatId = message.getChatId();
 
     try {
       bot.execute(Bot.deleteMessage(message));
@@ -178,23 +173,20 @@ public class JoinLeftHandler {
       LOG.warn("Cannot remove a message: {}. {}", userId, e.getMessage());
     }
 
-    String key = key(message.getChatId(), userId);
-    if (activePuzzles.containsKey(key)) {
-      ActivePuzzle info = activePuzzles.get(key);
-      info.getPuzzleThread().interrupt();
+    if (sessionService.isAlive(chatId, userId)) {
+      ActivePuzzle info = sessionService.find(chatId, userId);
       removeMessages(bot, message.getChatId(), info);
-      activePuzzles.remove(key);
+      sessionService.destroy(chatId, userId);
     }
 
     return null;
   }
 
   private boolean hasAccess(Integer userId, Long chatId, Integer messageId) {
-    String key = key(chatId, userId);
-    if (!activePuzzles.containsKey(key)) {
+    if (!sessionService.isAlive(chatId, userId)) {
       return false;
     } else {
-      ActivePuzzle puzzle = activePuzzles.get(key);
+      ActivePuzzle puzzle = sessionService.find(chatId, userId);
       return puzzle.getPuzzleMessageId().equals(messageId);
     }
   }
@@ -214,9 +206,5 @@ public class JoinLeftHandler {
     } catch (TelegramApiException e) {
       LOG.warn("Cannot remove a message: {}. {}", puzzle, e.getMessage());
     }
-  }
-
-  private String key(Long chatId, Integer userId) {
-    return chatId.toString() + userId.toString();
   }
 }

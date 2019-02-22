@@ -2,6 +2,7 @@ package com.github.snqlby.guardbot.handler;
 
 import static com.github.snqlby.guardbot.util.Constants.WORLD_GROUP_ID;
 
+import com.github.snqlby.guardbot.puzzle.Puzzle;
 import com.github.snqlby.tgwebhook.AcceptTypes;
 import com.github.snqlby.tgwebhook.Locality;
 import com.github.snqlby.tgwebhook.UpdateType;
@@ -12,12 +13,9 @@ import com.github.snqlby.tgwebhook.methods.JoinReason;
 import com.github.snqlby.tgwebhook.methods.LeaveMethod;
 import com.github.snqlby.tgwebhook.methods.LeaveReason;
 import java.time.Duration;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ThreadLocalRandom;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -31,8 +29,6 @@ import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageTe
 import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
 import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.User;
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 import org.telegram.telegrambots.meta.bots.AbsSender;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
@@ -41,7 +37,13 @@ import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 public class JoinLeftHandler {
 
   private static final Logger LOG = LoggerFactory.getLogger(JoinLeftHandler.class);
-  private Map<Integer, ActivePuzzle> activePuzzles = new ConcurrentHashMap<>();
+  private Map<String, ActivePuzzle> activePuzzles = new ConcurrentHashMap<>();
+  private Puzzle puzzle;
+
+  public JoinLeftHandler(Puzzle puzzle) {
+    this.puzzle = puzzle;
+    puzzle.setComplexity(4);
+  }
 
   /**
    * Process an event when user has joined the group.
@@ -59,124 +61,88 @@ public class JoinLeftHandler {
     var users = findJoinedUsers(reason, message);
     User user = users.get(0);
     Integer userId = user.getId();
-    muteUser(bot, userId);
+    muteUser(bot, message.getChatId(), userId);
 
     Integer joinMessageId = message.getMessageId();
-    SendMessage puzzleMessage = createPuzzleButton(
-        generatePuzzleMessage(user.getFirstName()), joinMessageId);
+    SendMessage puzzleMessage = (SendMessage) puzzle.nextPuzzle(message);
+    puzzleMessage
+        .setChatId(message.getChatId())
+        .setReplyToMessageId(joinMessageId)
+        .enableMarkdown(true)
+        .disableNotification();
     Integer puzzleMessageId;
     try {
       puzzleMessageId = bot.execute(puzzleMessage).getMessageId();
-      activePuzzles
-          .put(userId, new ActivePuzzle(joinMessageId, puzzleMessageId, user.getFirstName()));
+      activePuzzles.put(key(message.getChatId(), userId),
+          new ActivePuzzle(joinMessageId, puzzleMessageId));
     } catch (TelegramApiException e) {
       LOG.error("Cannot send puzzle to user {}", userId);
     }
     return null;
   }
 
-  private String generatePuzzleMessage(String firstName) {
-    return String
-        .format("Hello, %s. Let us make sure you are not a bot. **Find the Portal (\uD83C\uDF00)**",
-            firstName);
-  }
-
-  private SendMessage createPuzzleButton(String message, Integer messageId) {
-    return new SendMessage(WORLD_GROUP_ID, message)
-        .setReplyMarkup(new InlineKeyboardMarkup().setKeyboard(generatePuzzle(randomMinMax(3, 6))))
-        .setReplyToMessageId(messageId).disableNotification().enableMarkdown(true);
-  }
-
-  private EditMessageText updatePuzzleButton(String replyMessage, Long chatId, Integer messageId) {
-    return new EditMessageText().setText(replyMessage).setChatId(chatId).setMessageId(messageId)
-        .setReplyMarkup(new InlineKeyboardMarkup().setKeyboard(generatePuzzle(randomMinMax(3, 6))))
-        .enableMarkdown(true);
-  }
-
-  private int randomMinMax(int min, int max) {
-    return ThreadLocalRandom.current().nextInt(min, max + 1);
-  }
-
-  private List<List<InlineKeyboardButton>> generatePuzzle(int size) {
-    int xExit = randomMinMax(0, size - 1);
-    int yExit = randomMinMax(0, size - 1);
-    List<List<InlineKeyboardButton>> keyboard = new ArrayList<>();
-    for (int x = 0; x < size; x++) {
-      List<InlineKeyboardButton> row = new ArrayList<>();
-      for (int y = 0; y < size; y++) {
-        InlineKeyboardButton button = new InlineKeyboardButton();
-        String buttonIdentifier;
-        String buttonText;
-        if (x == xExit && y == yExit) {
-          buttonText = "\uD83C\uDF00";
-          buttonIdentifier = "solve";
-        } else {
-          buttonText = "💣";
-          buttonIdentifier = "banme";
-        }
-        button.setText(buttonText).setCallbackData(buttonIdentifier);
-        row.add(button);
-      }
-      keyboard.add(row);
-    }
-    return keyboard;
-  }
-
-  private int findExitPosition(int bound, Random random) {
-    return random.nextInt(bound);
-  }
-
   @CallbackMethod(data = "banme", origin = CallbackOrigin.MESSAGE, locality = Locality.SUPERGROUP)
   public BotApiMethod onBanMe(AbsSender bot, CallbackQuery query, CallbackOrigin origin) {
     Integer userId = query.getFrom().getId();
-    if (!activePuzzles.containsKey(userId)) {
+    Long chatId = query.getMessage().getChatId();
+    if (!hasAccess(userId, chatId, query.getMessage().getMessageId())) {
       return accessDeniedMessage(query.getId());
-    } else {
-      ActivePuzzle puzzle = activePuzzles.get(userId);
-      if (!puzzle.getPuzzleMessageId().equals(query.getMessage().getMessageId())) {
-        return accessDeniedMessage(query.getId());
-      }
     }
 
-    kickUser(bot, userId);
-    removeMessages(bot, activePuzzles.get(userId));
-    activePuzzles.remove(userId);
+    LOG.info("Captcha hasn't been resolved by {}", userId);
+
+    String key = key(chatId, userId);
+    ActivePuzzle info = activePuzzles.get(key);
+    kickUser(bot, query.getMessage().getChatId(), userId);
+    removeMessages(bot, chatId, info);
+    activePuzzles.remove(key);
 
     return null;
-  }
-
-  private BotApiMethod accessDeniedMessage(String queryId) {
-    return new AnswerCallbackQuery().setCallbackQueryId(queryId).setText("It's Not Your Fight any More");
   }
 
   @CallbackMethod(data = "solve", origin = CallbackOrigin.MESSAGE, locality = Locality.SUPERGROUP)
   public BotApiMethod onSolve(AbsSender bot, CallbackQuery query, CallbackOrigin origin) {
     Integer userId = query.getFrom().getId();
-    if (!hasAccess(userId, query.getMessage().getMessageId())) {
+    Long chatId = query.getMessage().getChatId();
+    if (!hasAccess(userId, chatId, query.getMessage().getMessageId())) {
       return accessDeniedMessage(query.getId());
     }
 
-    if (randomMinMax(1, 4) > 1) {
-      ActivePuzzle puzzle = activePuzzles.get(userId);
-      return updatePuzzleButton(generatePuzzleMessage(puzzle.getFirstName()), WORLD_GROUP_ID,
-          puzzle.getPuzzleMessageId());
+    if (puzzle.hasNext()) {
+      try {
+        EditMessageText newChallenge = (EditMessageText) puzzle.nextPuzzle(query);
+        newChallenge
+            .setChatId(chatId)
+            .setMessageId(query.getMessage().getMessageId())
+            .enableMarkdown(true);
+        bot.execute(newChallenge);
+        return successMessage(query.getId());
+      } catch (TelegramApiException e) {
+        LOG.error("Cannot generate a new puzzle, complete it");
+      }
     }
 
-    removeMessages(bot, activePuzzles.get(userId));
-    activePuzzles.remove(userId);
+    LOG.info("Captcha has been resolved by {}", userId);
 
-    return unmuteUser(userId);
+    String key = key(chatId, userId);
+    removeMessages(bot, chatId, activePuzzles.get(key));
+    activePuzzles.remove(key);
+
+    return unmuteUser(chatId, userId);
   }
 
-  private boolean hasAccess(Integer userId, Integer messageId) {
-    if (!activePuzzles.containsKey(userId)) {
-      return false;
-    } else {
-      ActivePuzzle puzzle = activePuzzles.get(userId);
-      return puzzle.getPuzzleMessageId().equals(messageId);
-    }
+  private BotApiMethod accessDeniedMessage(String queryId) {
+    return createCallbackMessage(queryId, "It's Not Your Fight Anymore");
   }
 
+  private BotApiMethod successMessage(String queryId) {
+    return createCallbackMessage(queryId, "Well Done");
+  }
+
+  private BotApiMethod createCallbackMessage(String queryId, String text) {
+    return new AnswerCallbackQuery().setCallbackQueryId(queryId)
+        .setText(text);
+  }
 
   /**
    * Process all leave messages.
@@ -201,18 +167,29 @@ public class JoinLeftHandler {
       LOG.warn("Cannot remove a message: {}. {}", userId, e.getMessage());
     }
 
-    if (activePuzzles.containsKey(userId)) {
-      removeMessages(bot, activePuzzles.get(userId));
-      activePuzzles.remove(userId);
+    String key = key(message.getChatId(), userId);
+    if (activePuzzles.containsKey(key)) {
+      removeMessages(bot, message.getChatId(), activePuzzles.get(key));
+      activePuzzles.remove(key);
     }
 
     return null;
   }
 
-  private void removeMessages(AbsSender bot, ActivePuzzle puzzle) {
+  private boolean hasAccess(Integer userId, Long chatId, Integer messageId) {
+    String key = key(chatId, userId);
+    if (!activePuzzles.containsKey(key)) {
+      return false;
+    } else {
+      ActivePuzzle puzzle = activePuzzles.get(key);
+      return puzzle.getPuzzleMessageId().equals(messageId);
+    }
+  }
+
+  private void removeMessages(AbsSender bot, long chatId, ActivePuzzle puzzle) {
     try {
-      bot.execute(deleteMessage(WORLD_GROUP_ID, puzzle.getJoinMessageId()));
-      bot.execute(deleteMessage(WORLD_GROUP_ID, puzzle.getPuzzleMessageId()));
+      bot.execute(deleteMessage(chatId, puzzle.getJoinMessageId()));
+      bot.execute(deleteMessage(chatId, puzzle.getPuzzleMessageId()));
     } catch (TelegramApiException e) {
       LOG.warn("Cannot remove a message: {}. {}", puzzle, e.getMessage());
     }
@@ -235,15 +212,12 @@ public class JoinLeftHandler {
     return deleteMessage(message.getChatId(), message.getMessageId());
   }
 
-  private boolean kickUser(AbsSender bot, int userId) {
-    final int banDuration = 3600;
+  private boolean kickUser(AbsSender bot, long chatId, int userId) {
+    final int banDuration = 60;
     try {
       bot.execute(
-          new KickChatMember(WORLD_GROUP_ID, userId)
-              .setUntilDate(
-                  (int)
-                      (System.currentTimeMillis() / Duration.ofSeconds(1).toMillis()
-                          + banDuration)));
+          new KickChatMember(chatId, userId)
+              .forTimePeriod(Duration.ofSeconds(banDuration)));
     } catch (TelegramApiException e) {
       LOG.error("Cannot execute KickChatMember method: {}", e.getMessage());
       return false;
@@ -251,9 +225,9 @@ public class JoinLeftHandler {
     return true;
   }
 
-  private boolean muteUser(AbsSender bot, int userId) {
+  private boolean muteUser(AbsSender bot, long groupId, int userId) {
     try {
-      bot.execute(new RestrictChatMember(WORLD_GROUP_ID, userId).setCanSendMessages(false));
+      bot.execute(new RestrictChatMember(groupId, userId).setCanSendMessages(false));
     } catch (TelegramApiException e) {
       LOG.error("Cannot execute KickChatMember method: {}", e.getMessage());
       return false;
@@ -261,11 +235,15 @@ public class JoinLeftHandler {
     return true;
   }
 
-  private BotApiMethod unmuteUser(int userId) {
-    return new RestrictChatMember(WORLD_GROUP_ID, userId)
+  private BotApiMethod unmuteUser(long chatId, int userId) {
+    return new RestrictChatMember(chatId, userId)
         .setCanSendMessages(true)
         .setCanAddWebPagePreviews(true)
         .setCanSendMediaMessages(true)
         .setCanSendOtherMessages(true);
+  }
+
+  private String key(Long chatId, Integer userId) {
+    return chatId.toString() + userId.toString();
   }
 }

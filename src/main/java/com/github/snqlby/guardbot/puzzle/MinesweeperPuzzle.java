@@ -60,7 +60,7 @@ public class MinesweeperPuzzle implements Puzzle {
 
   private String generatePuzzleMessage(String firstName) {
     return String
-        .format("Hello, %s. Let us make sure you are not a bot. **Find the Portal (\uD83C\uDF00)**",
+        .format("Hello, %s. Let us make sure you are not a bot. *Select the Portal (\uD83C\uDF00)*",
             firstName);
   }
 

@@ -31,13 +31,13 @@ import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
 @AcceptTypes({UpdateType.MESSAGE, UpdateType.CALLBACK_QUERY})
 @Component
-public class JoinLeftHandler {
+public class JoinLeaveHandler {
 
-  private static final Logger LOG = LoggerFactory.getLogger(JoinLeftHandler.class);
+  private static final Logger LOG = LoggerFactory.getLogger(JoinLeaveHandler.class);
   private final SessionService sessionService;
   private Puzzle puzzle;
 
-  public JoinLeftHandler(Puzzle puzzle, SessionService sessionService) {
+  public JoinLeaveHandler(Puzzle puzzle, SessionService sessionService) {
     this.puzzle = puzzle;
     this.sessionService = sessionService;
     puzzle.setComplexity(4);
@@ -79,7 +79,7 @@ public class JoinLeftHandler {
         }
 
         if (sessionService.isAlive(chatId, userId)) {
-          LOG.debug("Time to solve the puzzle for {}", userId);
+          LOG.info("Puzzle was not solved by {}", userId);
           ActivePuzzle puzzle = sessionService.find(chatId, userId);
           Bot.kickUser(bot, chatId, userId, PUZZLE_AUTOFAIL_TIME);
           removeMessages(bot, chatId, puzzle);
@@ -137,7 +137,7 @@ public class JoinLeftHandler {
         bot.execute(newChallenge);
         return successMessage(query.getId());
       } catch (TelegramApiException e) {
-        LOG.error("Cannot generate a new puzzle, complete it: {}", e);
+        LOG.warn("Cannot generate a new puzzle, complete it: {}", e);
       }
     }
 

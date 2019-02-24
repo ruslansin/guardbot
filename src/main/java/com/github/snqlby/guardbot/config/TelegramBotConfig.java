@@ -4,7 +4,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
-@ConfigurationProperties(prefix = "telegram")
+@ConfigurationProperties(prefix = "guardbot.telegram")
 public class TelegramBotConfig {
 
   private String token;

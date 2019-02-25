@@ -38,7 +38,7 @@ public class TelegramBotService extends TelegramWebhookBot {
       throws TelegramApiException {
     this.botConfig = botConfig;
 
-    this.resolver = new RequestResolver(this);
+    this.resolver = new RequestResolver("guardbot", this);
 
     if (botConfig.isUpdateWebhook()) {
       updateWebhook(botConfig);

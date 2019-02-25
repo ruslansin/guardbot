@@ -22,12 +22,9 @@ public class Application {
   public static void main(String[] args) {
     ConfigurableApplicationContext context = SpringApplication.run(Application.class, args);
     final Map<String, Object> handlers = context.getBeansWithAnnotation(AcceptTypes.class);
-    handlers
-        .values()
-        .forEach(
-            handler -> {
-              Handlers.addHandler(handler);
-              LOG.info("Loaded handler: {}", handler.getClass().getSimpleName());
-            });
+    handlers.values().forEach(handler -> {
+      Handlers.addHandler("guardbot", handler);
+      LOG.info("Loaded handler: {}", handler.getClass().getSimpleName());
+    });
   }
 }

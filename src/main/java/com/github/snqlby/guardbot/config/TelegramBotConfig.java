@@ -3,7 +3,7 @@ package com.github.snqlby.guardbot.config;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 
-@Configuration
+@Configuration("guardbotConfig")
 @ConfigurationProperties(prefix = "guardbot.telegram")
 public class TelegramBotConfig {
 

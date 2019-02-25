@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.StringJoiner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.methods.BotApiMethod;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
@@ -26,7 +27,7 @@ public class AddBotHandler {
   private static final Logger LOG = LoggerFactory.getLogger(AddBotHandler.class);
   private final TelegramBotConfig botConfig;
 
-  public AddBotHandler(TelegramBotConfig botConfig) {
+  public AddBotHandler(@Qualifier("guardbotConfig") TelegramBotConfig botConfig) {
     this.botConfig = botConfig;
   }
 

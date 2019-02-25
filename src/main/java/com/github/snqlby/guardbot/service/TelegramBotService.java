@@ -10,6 +10,7 @@ import java.util.Optional;
 import java.util.StringJoiner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.telegram.telegrambots.bots.TelegramWebhookBot;
 import org.telegram.telegrambots.meta.api.methods.BotApiMethod;
@@ -19,7 +20,7 @@ import org.telegram.telegrambots.meta.api.objects.WebhookInfo;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiRequestException;
 
-@Service
+@Service("guardbotService")
 public class TelegramBotService extends TelegramWebhookBot {
 
   private static final Logger LOG = LoggerFactory.getLogger(TelegramBotService.class);
@@ -34,7 +35,7 @@ public class TelegramBotService extends TelegramWebhookBot {
    * @param botConfig config instance
    * @throws TelegramApiException if webhook cannot be updated
    */
-  public TelegramBotService(TelegramBotConfig botConfig)
+  public TelegramBotService(@Qualifier("guardbotConfig") TelegramBotConfig botConfig)
       throws TelegramApiException {
     this.botConfig = botConfig;
 

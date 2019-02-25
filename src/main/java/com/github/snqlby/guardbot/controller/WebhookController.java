@@ -22,7 +22,7 @@ public class WebhookController {
     this.botService = botService;
   }
 
-  @RequestMapping(value = "/${telegram.token}", method = RequestMethod.POST)
+  @RequestMapping(value = "/${guardbot.telegram.token}", method = RequestMethod.POST)
   @ResponseBody
   public BotApiMethod<?> onUpdateReceived(@RequestBody Update update) {
     LOG.debug(update.toString());

@@ -86,6 +86,11 @@ public class MinesweeperPuzzle implements Puzzle {
       }
       keyboard.add(row);
     }
+    List<InlineKeyboardButton> row = new ArrayList<>();
+    String buttonText = "Ban";
+    String buttonIdentifier = "adminban";
+    row.add(new InlineKeyboardButton().setText(buttonText).setCallbackData(buttonIdentifier));
+    keyboard.add(row);
     return keyboard;
   }
 

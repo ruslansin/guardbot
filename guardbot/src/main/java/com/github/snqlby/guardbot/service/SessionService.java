@@ -1,6 +1,7 @@
 package com.github.snqlby.guardbot.service;
 
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.stereotype.Service;
 import org.telegram.telegrambots.meta.api.objects.Message;
@@ -17,12 +18,18 @@ public class SessionService {
     int joinMessageId = message.getMessageId();
     String key = key(chatId, userId);
     Thread puzzleThread = new Thread(runnable);
-    activePuzzles.put(key, new ActivePuzzle(joinMessageId, puzzleMessageId, puzzleThread));
+    activePuzzles.put(key, new ActivePuzzle(userId, joinMessageId, puzzleMessageId, puzzleThread));
     puzzleThread.start();
   }
 
   public ActivePuzzle find(Long chatId, Integer userId) {
     return activePuzzles.get(key(chatId, userId));
+  }
+
+  public Optional<Integer> findPuzzleOwner(Integer messageId) {
+    return activePuzzles.values().stream()
+        .filter(p -> p.getPuzzleMessageId().equals(messageId))
+        .map(ActivePuzzle::getUserId).findFirst();
   }
 
   public void remove(Long chatId, Integer userId) {

@@ -2,14 +2,25 @@ package com.github.snqlby.guardbot.service;
 
 public class ActivePuzzle {
 
+  private final Thread puzzleThread;
+  private Integer userId;
   private Integer joinMessageId;
   private Integer puzzleMessageId;
-  private final Thread puzzleThread;
 
-  public ActivePuzzle(Integer joinMessageId, Integer puzzleMessageId, Thread puzzleThread) {
+  public ActivePuzzle(Integer userId, Integer joinMessageId, Integer puzzleMessageId,
+      Thread puzzleThread) {
+    this.userId = userId;
     this.joinMessageId = joinMessageId;
     this.puzzleMessageId = puzzleMessageId;
     this.puzzleThread = puzzleThread;
+  }
+
+  public Integer getUserId() {
+    return userId;
+  }
+
+  public void setUserId(Integer userId) {
+    this.userId = userId;
   }
 
   public Integer getJoinMessageId() {

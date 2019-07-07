@@ -6,6 +6,7 @@ import static com.github.snqlby.guardbot.util.Constants.PUZZLE_CHALLENGE_TIME;
 
 import com.github.snqlby.guardbot.puzzle.Puzzle;
 import com.github.snqlby.guardbot.service.ActivePuzzle;
+import com.github.snqlby.guardbot.service.AdminService;
 import com.github.snqlby.guardbot.service.SessionService;
 import com.github.snqlby.guardbot.util.Bot;
 import com.github.snqlby.tgwebhook.AcceptTypes;
@@ -17,6 +18,7 @@ import com.github.snqlby.tgwebhook.methods.JoinMethod;
 import com.github.snqlby.tgwebhook.methods.JoinReason;
 import com.github.snqlby.tgwebhook.methods.LeaveMethod;
 import com.github.snqlby.tgwebhook.methods.LeaveReason;
+import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -35,11 +37,13 @@ public class JoinLeaveHandler {
 
   private static final Logger LOG = LoggerFactory.getLogger(JoinLeaveHandler.class);
   private final SessionService sessionService;
+  private final AdminService adminService;
   private Puzzle puzzle;
 
-  public JoinLeaveHandler(Puzzle puzzle, SessionService sessionService) {
+  public JoinLeaveHandler(Puzzle puzzle, SessionService sessionService, AdminService adminService) {
     this.puzzle = puzzle;
     this.sessionService = sessionService;
+    this.adminService = adminService;
     puzzle.setComplexity(4);
   }
 
@@ -115,6 +119,33 @@ public class JoinLeaveHandler {
   }
 
   @CallbackMethod(
+      data = "adminban",
+      origin = CallbackOrigin.MESSAGE,
+      locality = {Locality.GROUP, Locality.SUPERGROUP}
+  )
+  public BotApiMethod onAdminBan(AbsSender bot, CallbackQuery query, CallbackOrigin origin) {
+    Integer userId = query.getFrom().getId();
+    Long chatId = query.getMessage().getChatId();
+    Integer messageId = query.getMessage().getMessageId();
+
+    if (!adminService.isAdmin(chatId, userId)) {
+      return accessDeniedMessage(query.getId());
+    }
+
+    Optional<Integer> puzzleOwnerIdOptional = sessionService.findPuzzleOwner(messageId);
+    if (!puzzleOwnerIdOptional.isPresent()) {
+      return accessDeniedMessage(query.getId());
+    }
+    Integer puzzleOwnerId = puzzleOwnerIdOptional.get();
+    ActivePuzzle info = sessionService.find(chatId, puzzleOwnerId);
+    Bot.kickUser(bot, chatId, puzzleOwnerId, 0);
+    removeMessages(bot, chatId, info);
+    sessionService.destroy(chatId, puzzleOwnerId);
+
+    return null;
+  }
+
+  @CallbackMethod(
       data = "solve",
       origin = CallbackOrigin.MESSAGE,
       locality = {Locality.GROUP, Locality.SUPERGROUP}
@@ -137,7 +168,7 @@ public class JoinLeaveHandler {
         bot.execute(newChallenge);
         return successMessage(query.getId());
       } catch (TelegramApiException e) {
-        LOG.warn("Cannot generate a new puzzle, complete it: {}", e);
+        LOG.warn("Cannot generate a new puzzle, complete it: {}", e.getMessage());
       }
     }
 

@@ -1,0 +1,53 @@
+package com.github.snqlby.guardbot.handler;
+
+import com.github.snqlby.guardbot.service.AdminService;
+import com.github.snqlby.tgwebhook.AcceptTypes;
+import com.github.snqlby.tgwebhook.Locality;
+import com.github.snqlby.tgwebhook.UpdateType;
+import com.github.snqlby.tgwebhook.methods.CommandMethod;
+import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
+import org.telegram.telegrambots.meta.api.methods.BotApiMethod;
+import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
+import org.telegram.telegrambots.meta.api.objects.Message;
+import org.telegram.telegrambots.meta.bots.AbsSender;
+
+@AcceptTypes({UpdateType.MESSAGE})
+@Component
+public class AdminHandler {
+
+  private static final Logger LOG = LoggerFactory.getLogger(AdminHandler.class);
+  private final AdminService adminService;
+
+  public AdminHandler(AdminService adminService) {
+    this.adminService = adminService;
+  }
+
+  /**
+   * Reload admins for the chat.
+   *
+   * @param bot bot instance
+   * @param message received message
+   * @param args command args
+   * @return null if user doesn't exists
+   */
+  @CommandMethod(
+      locality = {Locality.GROUP, Locality.SUPERGROUP},
+      command = "/reload"
+  )
+  public BotApiMethod onReload(AbsSender bot, Message message, List<String> args) {
+    Long chatId = message.getChatId();
+    LOG.info("Reload was requested by {} from {}", message.getFrom().getId(), chatId);
+
+    if (!adminService.isChatPresent(chatId)
+        || adminService.isAdmin(chatId, message.getFrom().getId())) {
+      boolean success = adminService.reload(chatId);
+      if (success) {
+        return new SendMessage(chatId, "*Admins were reloaded*").enableMarkdown(true);
+      }
+    }
+    return new SendMessage(chatId, "*Admins were not reloaded*").enableMarkdown(true);
+  }
+}

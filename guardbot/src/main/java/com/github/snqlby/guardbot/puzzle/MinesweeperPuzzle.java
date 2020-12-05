@@ -2,6 +2,7 @@ package com.github.snqlby.guardbot.puzzle;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.interfaces.BotApiObject;
@@ -34,31 +35,27 @@ public class MinesweeperPuzzle implements Puzzle {
   }
 
   @Override
-  public BotApiMethod<?> nextPuzzle(BotApiObject botApiObject) {
+  public BotApiMethod<?> nextPuzzle(BotApiObject botApiObject, Map<String, Object> params) {
     if (botApiObject instanceof Message) {
-      Message message = (Message) botApiObject;
-      String firstName = message.getFrom().getFirstName();
-      return createPuzzleButton(firstName);
+      return createPuzzleButton(params.get("firstName"));
     } else {
-      CallbackQuery query = (CallbackQuery) botApiObject;
-      String firstName = query.getFrom().getFirstName();
-      return updatePuzzleButton(firstName);
+      return updatePuzzleButton(params.get("firstName"));
     }
   }
 
-  private SendMessage createPuzzleButton(String firstName) {
+  private SendMessage createPuzzleButton(Object firstName) {
     return new SendMessage()
         .setText(generatePuzzleMessage(firstName))
         .setReplyMarkup(new InlineKeyboardMarkup().setKeyboard(generatePuzzle((int) complexity)));
   }
 
-  private EditMessageText updatePuzzleButton(String firstName) {
+  private EditMessageText updatePuzzleButton(Object firstName) {
     return new EditMessageText()
         .setText(generatePuzzleMessage(firstName))
         .setReplyMarkup(new InlineKeyboardMarkup().setKeyboard(generatePuzzle((int) complexity)));
   }
 
-  private String generatePuzzleMessage(String firstName) {
+  private String generatePuzzleMessage(Object firstName) {
     return String
         .format("Hello, %s. Let us make sure you are not a bot. *Select the Portal (\uD83C\uDF00)*",
             firstName);
@@ -86,11 +83,6 @@ public class MinesweeperPuzzle implements Puzzle {
       }
       keyboard.add(row);
     }
-    List<InlineKeyboardButton> row = new ArrayList<>();
-    String buttonText = "Ban";
-    String buttonIdentifier = "adminban";
-    row.add(new InlineKeyboardButton().setText(buttonText).setCallbackData(buttonIdentifier));
-    keyboard.add(row);
     return keyboard;
   }
 

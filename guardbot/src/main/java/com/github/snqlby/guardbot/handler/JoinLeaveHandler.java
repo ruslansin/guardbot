@@ -18,6 +18,9 @@ import com.github.snqlby.tgwebhook.methods.JoinMethod;
 import com.github.snqlby.tgwebhook.methods.JoinReason;
 import com.github.snqlby.tgwebhook.methods.LeaveMethod;
 import com.github.snqlby.tgwebhook.methods.LeaveReason;
+
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,6 +30,7 @@ import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText;
 import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
 import org.telegram.telegrambots.meta.api.objects.Message;
+import org.telegram.telegrambots.meta.api.objects.MessageEntity;
 import org.telegram.telegrambots.meta.api.objects.User;
 import org.telegram.telegrambots.meta.bots.AbsSender;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
@@ -65,7 +69,8 @@ public class JoinLeaveHandler {
     Bot.muteUser(bot, chatId, userId);
 
     Integer joinMessageId = message.getMessageId();
-    SendMessage puzzleMessage = (SendMessage) puzzle.nextPuzzle(message);
+    Map<String, Object> params = Map.of("firstName", user.getFirstName());
+    SendMessage puzzleMessage = (SendMessage) puzzle.nextPuzzle(message, params);
     puzzleMessage
         .setChatId(chatId)
         .setReplyToMessageId(joinMessageId)
@@ -103,44 +108,22 @@ public class JoinLeaveHandler {
   )
   public BotApiMethod onBanMe(AbsSender bot, CallbackQuery query, CallbackOrigin origin) {
     Integer userId = query.getFrom().getId();
-    Long chatId = query.getMessage().getChatId();
-    if (!hasAccess(userId, chatId, query.getMessage().getMessageId())) {
+    Message message = query.getMessage();
+    Long chatId = message.getChatId();
+    Message originalMessage = message.getReplyToMessage();
+    boolean isUserAdmin = adminService.isAdmin(chatId, userId);
+    if (!hasAccess(userId, chatId, message.getMessageId()) && !isUserAdmin) {
       return accessDeniedMessage(query.getId());
     }
 
-    LOG.info("Captcha hasn't been solved by {}", userId);
+    User originalUser = originalMessage.getFrom();
+    Integer originalUserId = originalUser.getId();
+    LOG.info("Captcha hasn't been solved for {}", originalUserId);
 
-    ActivePuzzle info = sessionService.find(chatId, userId);
-    Bot.kickUser(bot, query.getMessage().getChatId(), userId, PUZZLE_BAN_TIME);
+    ActivePuzzle info = sessionService.find(chatId, originalUserId);
+    Bot.kickUser(bot, message.getChatId(), originalUserId, PUZZLE_BAN_TIME);
     removeMessages(bot, chatId, info);
-    sessionService.destroy(chatId, userId);
-
-    return null;
-  }
-
-  @CallbackMethod(
-      data = "adminban",
-      origin = CallbackOrigin.MESSAGE,
-      locality = {Locality.GROUP, Locality.SUPERGROUP}
-  )
-  public BotApiMethod onAdminBan(AbsSender bot, CallbackQuery query, CallbackOrigin origin) {
-    Integer userId = query.getFrom().getId();
-    Long chatId = query.getMessage().getChatId();
-    Integer messageId = query.getMessage().getMessageId();
-
-    if (!adminService.isAdmin(chatId, userId)) {
-      return accessDeniedMessage(query.getId());
-    }
-
-    Optional<Integer> puzzleOwnerIdOptional = sessionService.findPuzzleOwner(messageId);
-    if (!puzzleOwnerIdOptional.isPresent()) {
-      return accessDeniedMessage(query.getId());
-    }
-    Integer puzzleOwnerId = puzzleOwnerIdOptional.get();
-    ActivePuzzle info = sessionService.find(chatId, puzzleOwnerId);
-    Bot.kickUser(bot, chatId, puzzleOwnerId, 0);
-    removeMessages(bot, chatId, info);
-    sessionService.destroy(chatId, puzzleOwnerId);
+    sessionService.destroy(chatId, originalUserId);
 
     return null;
   }
@@ -152,15 +135,22 @@ public class JoinLeaveHandler {
   )
   public BotApiMethod onSolve(AbsSender bot, CallbackQuery query, CallbackOrigin origin) {
     Integer userId = query.getFrom().getId();
-    Long chatId = query.getMessage().getChatId();
-    Integer messageId = query.getMessage().getMessageId();
-    if (!hasAccess(userId, chatId, messageId)) {
+    Message message = query.getMessage();
+    Long chatId = message.getChatId();
+    Message originalMessage = message.getReplyToMessage();
+    Integer messageId = message.getMessageId();
+    boolean isUserAdmin = adminService.isAdmin(chatId, userId);
+    if (!hasAccess(userId, chatId, messageId) && !isUserAdmin) {
       return accessDeniedMessage(query.getId());
     }
 
+    User originalUser = originalMessage.getFrom();
+    Integer originalUserId = originalUser.getId();
+
     if (puzzle.hasNext()) {
       try {
-        EditMessageText newChallenge = (EditMessageText) puzzle.nextPuzzle(query);
+        Map<String, Object> params = Map.of("firstName", originalUser.getFirstName());
+        EditMessageText newChallenge = (EditMessageText) puzzle.nextPuzzle(query, params);
         newChallenge
             .setChatId(chatId)
             .setMessageId(messageId)
@@ -172,13 +162,13 @@ public class JoinLeaveHandler {
       }
     }
 
-    LOG.info("Captcha has been solved by {}", userId);
+    LOG.info("Captcha has been solved for {}", originalUserId);
 
-    ActivePuzzle info = sessionService.find(chatId, userId);
+    ActivePuzzle info = sessionService.find(chatId, originalUserId);
     removeMessages(bot, chatId, info);
-    sessionService.destroy(chatId, userId);
+    sessionService.destroy(chatId, originalUserId);
 
-    return Bot.unmuteUser(chatId, userId);
+    return Bot.unmuteUser(chatId, originalUserId);
   }
 
   /**

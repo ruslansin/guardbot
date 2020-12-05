@@ -79,7 +79,7 @@ public class AdminHandler {
     String name = args.get(1);
     String value = args.get(2);
 
-    LOG.info("Parameters where requested by {}", message.getFrom().getId());
+    LOG.info("Parameter update were requested by {}", message.getFrom().getId());
 
     if (adminService.isAdmin(chatId, message.getFrom().getId())) {
       ParameterData data = ParameterData.findByName(name);

@@ -7,6 +7,8 @@ import com.github.snqlby.tgwebhook.AcceptTypes;
 import com.github.snqlby.tgwebhook.Locality;
 import com.github.snqlby.tgwebhook.UpdateType;
 import com.github.snqlby.tgwebhook.methods.CommandMethod;
+
+import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 
@@ -94,5 +96,26 @@ public class AdminHandler {
               .enableMarkdown(true);
     }
     return null;
+  }
+
+  /**
+   * Show group list where user is an admin.
+   *
+   * /chats
+   * @param bot bot instance
+   * @param message received message
+   * @param args command args
+   * @return null if user doesn't exists
+   */
+  @CommandMethod(
+          locality = {Locality.PRIVATE},
+          command = "/groups"
+  )
+  public BotApiMethod onGroupsRequest(AbsSender bot, Message message, List<String> args) {
+    Integer userId = message.getFrom().getId();
+    LOG.info("Groups were requested by {}", userId);
+
+    List<Long> chats = adminService.findChats(userId);
+    return new SendMessage(message.getChatId(), "Admin was found in the following groups: " + chats.toString());
   }
 }

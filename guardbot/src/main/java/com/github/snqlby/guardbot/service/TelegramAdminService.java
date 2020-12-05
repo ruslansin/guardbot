@@ -59,4 +59,12 @@ public class TelegramAdminService implements AdminService {
 
     return false;
   }
+
+  @Override
+  public List<Long> findChats(long userId) {
+    return admins.entrySet().stream()
+            .filter(v -> v.getValue().contains(userId))
+            .map(Map.Entry::getKey)
+            .collect(Collectors.toList());
+  }
 }

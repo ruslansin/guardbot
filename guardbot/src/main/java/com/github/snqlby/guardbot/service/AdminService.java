@@ -1,5 +1,7 @@
 package com.github.snqlby.guardbot.service;
 
+import java.util.List;
+
 public interface AdminService {
 
   /**
@@ -16,5 +18,10 @@ public interface AdminService {
    * Attempt to reload admins for the chat.
    */
   boolean reload(long chatId);
+
+  /**
+   * Find chats where user is an admin.
+   */
+  List<Long> findChats(long userId);
 
 }

@@ -1,11 +1,15 @@
 package com.github.snqlby.guardbot.handler;
 
+import com.github.snqlby.guardbot.data.ParameterData;
 import com.github.snqlby.guardbot.service.AdminService;
+import com.github.snqlby.guardbot.service.ParameterService;
 import com.github.snqlby.tgwebhook.AcceptTypes;
 import com.github.snqlby.tgwebhook.Locality;
 import com.github.snqlby.tgwebhook.UpdateType;
 import com.github.snqlby.tgwebhook.methods.CommandMethod;
 import java.util.List;
+import java.util.Objects;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -20,9 +24,11 @@ public class AdminHandler {
 
   private static final Logger LOG = LoggerFactory.getLogger(AdminHandler.class);
   private final AdminService adminService;
+  private final ParameterService parameterService;
 
-  public AdminHandler(AdminService adminService) {
+  public AdminHandler(AdminService adminService, ParameterService parameterService) {
     this.adminService = adminService;
+    this.parameterService = parameterService;
   }
 
   /**
@@ -49,5 +55,44 @@ public class AdminHandler {
       }
     }
     return new SendMessage(chatId, "*Admins were not reloaded*").enableMarkdown(true);
+  }
+
+  /**
+   * Update chat settings.
+   *
+   * /parameter chatId parameter value
+   * @param bot bot instance
+   * @param message received message
+   * @param args command args
+   * @return null if user doesn't exists
+   */
+  @CommandMethod(
+          locality = {Locality.PRIVATE},
+          command = "/parameter"
+  )
+  public BotApiMethod onParametersRequest(AbsSender bot, Message message, List<String> args) {
+    if (args.size() < 3) {
+      return null;
+    }
+
+    long chatId = Long.parseLong(args.get(0));
+    String name = args.get(1);
+    String value = args.get(2);
+
+    LOG.info("Parameters where requested by {}", message.getFrom().getId());
+
+    if (adminService.isAdmin(chatId, message.getFrom().getId())) {
+      ParameterData data = ParameterData.findByName(name);
+      if (Objects.isNull(data)) {
+        return new SendMessage(message.getChatId(),"*Unknown parameter*")
+                .setReplyToMessageId(message.getMessageId())
+                .enableMarkdown(true);
+      }
+      parameterService.createOrUpdate(data, chatId, value);
+      return new SendMessage(message.getChatId(),"*Parameter was updated*")
+              .setReplyToMessageId(message.getMessageId())
+              .enableMarkdown(true);
+    }
+    return null;
   }
 }

@@ -4,9 +4,11 @@ import static com.github.snqlby.guardbot.util.Constants.PUZZLE_AUTOFAIL_TIME;
 import static com.github.snqlby.guardbot.util.Constants.PUZZLE_BAN_TIME;
 import static com.github.snqlby.guardbot.util.Constants.PUZZLE_CHALLENGE_TIME;
 
+import com.github.snqlby.guardbot.data.ParameterData;
 import com.github.snqlby.guardbot.puzzle.Puzzle;
 import com.github.snqlby.guardbot.service.ActivePuzzle;
 import com.github.snqlby.guardbot.service.AdminService;
+import com.github.snqlby.guardbot.service.ParameterService;
 import com.github.snqlby.guardbot.service.SessionService;
 import com.github.snqlby.guardbot.util.Bot;
 import com.github.snqlby.tgwebhook.AcceptTypes;
@@ -42,12 +44,14 @@ public class JoinLeaveHandler {
   private static final Logger LOG = LoggerFactory.getLogger(JoinLeaveHandler.class);
   private final SessionService sessionService;
   private final AdminService adminService;
+  private final ParameterService parameterService;
   private Puzzle puzzle;
 
-  public JoinLeaveHandler(Puzzle puzzle, SessionService sessionService, AdminService adminService) {
+  public JoinLeaveHandler(Puzzle puzzle, SessionService sessionService, AdminService adminService, ParameterService parameterService) {
     this.puzzle = puzzle;
     this.sessionService = sessionService;
     this.adminService = adminService;
+    this.parameterService = parameterService;
     puzzle.setComplexity(4);
   }
 
@@ -63,6 +67,25 @@ public class JoinLeaveHandler {
       reason = {JoinReason.SELF}
   )
   public BotApiMethod onUserJoined(AbsSender bot, Message message, JoinReason reason) {
+    Long chatId = message.getChatId();
+
+    Boolean captchaModuleEnabled = parameterService.findParameterOrDefault(ParameterData.MODULE_CAPTCHA_ENABLED, chatId, true);
+    Boolean joinDeleteModuleEnabled = parameterService.findParameterOrDefault(ParameterData.MODULE_DELETE_JOIN_MESSAGE_ENABLED, chatId, true);
+    if (captchaModuleEnabled) {
+      startCaptcha(bot, message);
+    } else if (joinDeleteModuleEnabled) {
+      // normally captcha module will remove join messages. in case the module is enabled, we will join delete messages
+      try {
+        bot.execute(Bot.deleteMessage(chatId, message.getMessageId()));
+      } catch (TelegramApiException e) {
+        LOG.error("Cannot delete a join message {} from {}", message.getMessageId(), chatId);
+      }
+    }
+
+    return null;
+  }
+
+  private void startCaptcha(AbsSender bot, Message message) {
     User user = message.getFrom();
     Integer userId = user.getId();
     Long chatId = message.getChatId();
@@ -72,10 +95,10 @@ public class JoinLeaveHandler {
     Map<String, Object> params = Map.of("firstName", user.getFirstName());
     SendMessage puzzleMessage = (SendMessage) puzzle.nextPuzzle(message, params);
     puzzleMessage
-        .setChatId(chatId)
-        .setReplyToMessageId(joinMessageId)
-        .enableMarkdown(true)
-        .disableNotification();
+            .setChatId(chatId)
+            .setReplyToMessageId(joinMessageId)
+            .enableMarkdown(true)
+            .disableNotification();
     Integer puzzleMessageId;
     try {
       puzzleMessageId = bot.execute(puzzleMessage).getMessageId();
@@ -98,7 +121,6 @@ public class JoinLeaveHandler {
     } catch (TelegramApiException e) {
       LOG.error("Cannot send puzzle to user {}", userId);
     }
-    return null;
   }
 
   @CallbackMethod(

@@ -12,6 +12,7 @@ import com.github.snqlby.tgwebhook.methods.MessageMethod;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 import org.telegram.telegrambots.meta.api.methods.BotApiMethod;
 import org.telegram.telegrambots.meta.api.objects.Chat;
 import org.telegram.telegrambots.meta.api.objects.Message;
@@ -48,7 +49,8 @@ public class MessageHandler {
 
     if (!Objects.isNull(message.getForwardDate()) && !isForwardedFromSameChat(message)) {
       Boolean deleteForwardEnabled = parameterService.findParameterOrDefault(ParameterData.MODULE_DELETE_FORWARD_MESSAGE_ENABLED, chatId, false);
-      if (deleteForwardEnabled && !adminService.isAdmin(chatId, message.getFrom().getId())) {
+      if (deleteForwardEnabled && !adminService.isAdmin(chatId, message.getFrom().getId())
+        && !hasAllowedWords(message)) {
         try {
           bot.execute(Bot.deleteMessage(message));
         } catch (TelegramApiException e) {
@@ -58,6 +60,22 @@ public class MessageHandler {
     }
 
     return null;
+  }
+
+  private boolean hasAllowedWords(Message message) {
+    String[] allowedWords = parameterService.findParameterOrDefault(ParameterData.MODULE_DELETE_FORWARD_MESSAGE_FILTER, message.getChatId(), new String[]{});
+    String text = message.getText();
+    if (StringUtils.isEmpty(message.getText())) {
+      return false;
+    }
+
+    for (String allowedWord : allowedWords) {
+      if (text.toLowerCase().contains(allowedWord.toLowerCase())) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   private boolean isForwardedFromSameChat(Message message) {

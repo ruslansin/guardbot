@@ -37,7 +37,7 @@ public class ParameterService {
 			} else if (String.class.equals(parameter.getType())) {
 				return (T) parameterEntity.getValue();
 			} else if (String[].class.equals(parameter.getType())) {
-				return (T) StringUtils.split(parameterEntity.getValue(), ",");
+				return (T) parameterEntity.getValue().split(",");
 			}
 			log.error("Unknown type: {} for parameter: {}", parameterEntity.getType(), parameter.getName());
 			throw new IllegalStateException("Can't process type");

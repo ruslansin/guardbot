@@ -4,10 +4,10 @@ import lombok.Getter;
 
 @Getter
 public enum ParameterData {
-	MODULE_CAPTCHA_ENABLED("module.captcha.enabled", Boolean.class, "Капча при входе активна. Значения: <true/false>"),
-	MODULE_DELETE_JOIN_MESSAGE_ENABLED("module.delete_join_message.enabled", Boolean.class, "Удалять сообщения о входе. Значения: <true/false>"),
-	MODULE_DELETE_FORWARD_MESSAGE_ENABLED("module.delete_forward_message.enabled", Boolean.class, "Удалять ли перадресованные сообщения. Значения: <true/false>"),
-	MODULE_DELETE_FORWARD_MESSAGE_FILTER("module.delete_forward_message.filter", String[].class, "Исключения для переадресованных сообщений. Значения: <a,b,c>");
+	MODULE_CAPTCHA_ENABLED("module.captcha.enabled", Boolean.class, "Captcha is active on join. Args: <true/false>"),
+	MODULE_DELETE_JOIN_MESSAGE_ENABLED("module.delete_join_message.enabled", Boolean.class, "Remote join messages. Args: <true/false>"),
+	MODULE_DELETE_FORWARD_MESSAGE_ENABLED("module.delete_forward_message.enabled", Boolean.class, "Remove forwarded messages. Args: <true/false>"),
+	MODULE_DELETE_FORWARD_MESSAGE_FILTER("module.delete_forward_message.filter", String[].class, "Allow forwarded messages with keywords: <a,b,c>");
 
 	private final String name;
 

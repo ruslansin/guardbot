@@ -1,7 +1,7 @@
 package com.github.snqlby.guardbot.service;
 
 
-import static com.github.snqlby.guardbot.util.Constants.ADMIN_ID;
+import static com.github.snqlby.guardbot.util.Constants.ROOT_ADMIN_ID;
 
 import com.github.snqlby.guardbot.config.TelegramBotConfig;
 import com.github.snqlby.tgwebhook.RequestResolver;
@@ -56,9 +56,9 @@ public class TelegramBotService extends TelegramWebhookBot {
       if (botConfig.isUpdateWebhook()) {
         joiner.add(String.format("*Webhook url: *`%s`", botConfig.getUrl()));
       }
-      execute(new SendMessage((long) ADMIN_ID, joiner.toString()).enableMarkdown(true));
+      execute(new SendMessage((long) ROOT_ADMIN_ID, joiner.toString()).enableMarkdown(true));
     } catch (TelegramApiException e) {
-      LOG.error("Cannot notify the admin with ID{}", ADMIN_ID);
+      LOG.error("Cannot notify the admin with ID{}", ROOT_ADMIN_ID);
     }
   }
 

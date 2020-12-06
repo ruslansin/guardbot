@@ -1,6 +1,6 @@
 package com.github.snqlby.guardbot.handler;
 
-import static com.github.snqlby.guardbot.util.Constants.ADMIN_ID;
+import static com.github.snqlby.guardbot.util.Constants.ROOT_ADMIN_ID;
 
 import com.github.snqlby.guardbot.config.TelegramBotConfig;
 import com.github.snqlby.tgwebhook.AcceptTypes;
@@ -47,7 +47,7 @@ public class AddBotHandler {
       return null;
     }
     LOG.info("Bot was added to {} by {}", message.getChatId(), message.getFrom().getId());
-    return new SendMessage((long) ADMIN_ID, generateReply(message)).enableMarkdown(true);
+    return new SendMessage((long) ROOT_ADMIN_ID, generateReply(message)).enableMarkdown(true);
   }
 
   private boolean hasBot(List<User> users, String botUsername) {

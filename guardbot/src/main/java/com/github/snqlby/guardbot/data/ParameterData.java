@@ -15,10 +15,20 @@ public enum ParameterData {
 
 	private final String description;
 
+	private final boolean visible;
+
 	ParameterData(String name, Class<?> type, String description) {
 		this.name = name;
 		this.type = type;
 		this.description = description;
+		this.visible = true;
+	}
+
+	ParameterData(String name, Class<?> type, String description, boolean visible) {
+		this.name = name;
+		this.type = type;
+		this.description = description;
+		this.visible = visible;
 	}
 
 	public static ParameterData findByName(String name) {

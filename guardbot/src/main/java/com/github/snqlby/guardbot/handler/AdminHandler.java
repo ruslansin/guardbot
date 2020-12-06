@@ -112,6 +112,9 @@ public class AdminHandler {
 
     StringJoiner joiner = new StringJoiner(System.lineSeparator());
     for (ParameterData parameter : ParameterData.values()) {
+      if (!parameter.isVisible()) {
+        continue;
+      }
       joiner.add(String.format("*%s* - _%s_", parameter.getName(), parameter.getDescription()));
     }
 

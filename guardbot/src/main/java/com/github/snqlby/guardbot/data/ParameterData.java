@@ -8,7 +8,9 @@ public enum ParameterData {
 	MODULE_DELETE_JOIN_MESSAGE_ENABLED("module.delete_join_message.enabled", Boolean.class, "Remote join messages.", "<true/false>"),
 	MODULE_DELETE_FORWARD_MESSAGE_ENABLED("module.delete_forward_message.enabled", Boolean.class, "Remove forwarded messages.", "<true/false>"),
 	MODULE_DELETE_FORWARD_MESSAGE_FILTER("module.delete_forward_message.filter", String[].class, "Allow forwarded messages with keywords.", "<str1,str2,str3>"),
-	CHAT_LOCALE("chat.locale", String.class, "Chat locale for strings.", "<str>");
+	CHAT_LOCALE("chat.locale", String.class, "Chat locale for strings.", "<str>"),
+	MODULE_MINESWEEPER_SOLVE_SYMBOL("module.minesweeper.solve.symbol", String.class, "Solve symbol for minesweeper puzzle.", "<emoji>"),
+	MODULE_MINESWEEPER_BAN_SYMBOL("module.minesweeper.ban.symbol", String.class, "Ban symbol for minesweeper puzzle.", "<emoji>");
 
 	private final String name;
 

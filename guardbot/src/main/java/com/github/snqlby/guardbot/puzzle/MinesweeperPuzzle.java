@@ -6,29 +6,26 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.ResourceBundle;
 import java.util.concurrent.ThreadLocalRandom;
-import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.interfaces.BotApiObject;
 import org.telegram.telegrambots.meta.api.methods.BotApiMethod;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText;
-import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
 import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 
-@Component
 public class MinesweeperPuzzle implements Puzzle {
 
-  private double complexity;
+  private final double complexity;
 
-  @Override
-  public double getComplexity() {
-    return complexity;
-  }
+  private final String solveEmoji;
 
-  @Override
-  public void setComplexity(double complexity) {
+  private final String banEmoji;
+
+  public MinesweeperPuzzle(double complexity, String solveEmoji, String banEmoji) {
     this.complexity = complexity;
+    this.solveEmoji = solveEmoji;
+    this.banEmoji = banEmoji;
   }
 
   @Override
@@ -62,7 +59,7 @@ public class MinesweeperPuzzle implements Puzzle {
     ResourceBundle bundle = ResourceBundle.getBundle("strings", locale);
     return String
         .format(bundle.getString("puzzle.minesweeper.hello.template"),
-            params.get("firstName"), "\uD83C\uDF00");
+            params.get("firstName"), solveEmoji);
   }
 
   private List<List<InlineKeyboardButton>> generatePuzzle(int size) {
@@ -76,10 +73,10 @@ public class MinesweeperPuzzle implements Puzzle {
         String buttonIdentifier;
         String buttonText;
         if (x == xSolve && y == ySolve) {
-          buttonText = "\uD83C\uDF00";
+          buttonText = solveEmoji;
           buttonIdentifier = "solve";
         } else {
-          buttonText = "💣";
+          buttonText = banEmoji;
           buttonIdentifier = "banme";
         }
         button.setText(buttonText).setCallbackData(buttonIdentifier);

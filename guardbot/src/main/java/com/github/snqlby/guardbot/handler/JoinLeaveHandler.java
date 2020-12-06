@@ -9,7 +9,7 @@ import com.github.snqlby.guardbot.puzzle.Puzzle;
 import com.github.snqlby.guardbot.service.ActivePuzzle;
 import com.github.snqlby.guardbot.service.AdminService;
 import com.github.snqlby.guardbot.service.ParameterService;
-import com.github.snqlby.guardbot.service.SessionService;
+import com.github.snqlby.guardbot.service.PuzzleSessionService;
 import com.github.snqlby.guardbot.util.Bot;
 import com.github.snqlby.tgwebhook.AcceptTypes;
 import com.github.snqlby.tgwebhook.Locality;
@@ -42,17 +42,14 @@ import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 public class JoinLeaveHandler {
 
   private static final Logger LOG = LoggerFactory.getLogger(JoinLeaveHandler.class);
-  private final SessionService sessionService;
+  private final PuzzleSessionService puzzleSessionService;
   private final AdminService adminService;
   private final ParameterService parameterService;
-  private Puzzle puzzle;
 
-  public JoinLeaveHandler(Puzzle puzzle, SessionService sessionService, AdminService adminService, ParameterService parameterService) {
-    this.puzzle = puzzle;
-    this.sessionService = sessionService;
+  public JoinLeaveHandler(PuzzleSessionService puzzleSessionService, AdminService adminService, ParameterService parameterService) {
+    this.puzzleSessionService = puzzleSessionService;
     this.adminService = adminService;
     this.parameterService = parameterService;
-    puzzle.setComplexity(4);
   }
 
   /**
@@ -97,6 +94,8 @@ public class JoinLeaveHandler {
             "firstName", user.getFirstName(),
             "locale", chatLocale
     );
+    ActivePuzzle activePuzzle = puzzleSessionService.create(message);
+    Puzzle puzzle = activePuzzle.getPuzzle();
     SendMessage puzzleMessage = (SendMessage) puzzle.nextPuzzle(message, params);
     puzzleMessage
             .setChatId(chatId)
@@ -106,7 +105,7 @@ public class JoinLeaveHandler {
     Integer puzzleMessageId;
     try {
       puzzleMessageId = bot.execute(puzzleMessage).getMessageId();
-      sessionService.create(message, puzzleMessageId, () -> {
+      puzzleSessionService.start(message, puzzleMessageId, () -> {
         try {
           Thread.sleep(PUZZLE_CHALLENGE_TIME * 1000);
         } catch (InterruptedException e) {
@@ -114,12 +113,11 @@ public class JoinLeaveHandler {
           return;
         }
 
-        if (sessionService.isAlive(chatId, userId)) {
+        if (puzzleSessionService.isAlive(chatId, userId)) {
           LOG.info("Puzzle was not solved by {}", userId);
-          ActivePuzzle puzzle = sessionService.find(chatId, userId);
           Bot.kickUser(bot, chatId, userId, PUZZLE_AUTOFAIL_TIME);
-          removeMessages(bot, chatId, puzzle);
-          sessionService.destroy(chatId, userId);
+          removeMessages(bot, chatId, activePuzzle);
+          puzzleSessionService.destroy(chatId, userId);
         }
       });
     } catch (TelegramApiException e) {
@@ -147,10 +145,10 @@ public class JoinLeaveHandler {
     Integer originalUserId = originalUser.getId();
     LOG.info("Captcha hasn't been solved for {}", originalUserId);
 
-    ActivePuzzle info = sessionService.find(chatId, originalUserId);
+    ActivePuzzle info = puzzleSessionService.find(chatId, originalUserId);
     Bot.kickUser(bot, message.getChatId(), originalUserId, PUZZLE_BAN_TIME);
     removeMessages(bot, chatId, info);
-    sessionService.destroy(chatId, originalUserId);
+    puzzleSessionService.destroy(chatId, originalUserId);
 
     return null;
   }
@@ -175,6 +173,8 @@ public class JoinLeaveHandler {
     User originalUser = originalMessage.getFrom();
     Integer originalUserId = originalUser.getId();
 
+    ActivePuzzle activePuzzle = puzzleSessionService.find(chatId, userId);
+    Puzzle puzzle = activePuzzle.getPuzzle();
     if (puzzle.hasNext()) {
       try {
         String chatLocale = parameterService.findParameterOrDefault(ParameterData.CHAT_LOCALE, chatId, "en");
@@ -196,9 +196,8 @@ public class JoinLeaveHandler {
 
     LOG.info("Captcha has been solved for {}", originalUserId);
 
-    ActivePuzzle info = sessionService.find(chatId, originalUserId);
-    removeMessages(bot, chatId, info);
-    sessionService.destroy(chatId, originalUserId);
+    removeMessages(bot, chatId, activePuzzle);
+    puzzleSessionService.destroy(chatId, originalUserId);
 
     return Bot.unmuteUser(chatId, originalUserId);
   }
@@ -226,20 +225,20 @@ public class JoinLeaveHandler {
       LOG.warn("Cannot remove a message: {}. {}", userId, e.getMessage());
     }
 
-    if (sessionService.isAlive(chatId, userId)) {
-      ActivePuzzle info = sessionService.find(chatId, userId);
+    if (puzzleSessionService.isAlive(chatId, userId)) {
+      ActivePuzzle info = puzzleSessionService.find(chatId, userId);
       removeMessages(bot, message.getChatId(), info);
-      sessionService.destroy(chatId, userId);
+      puzzleSessionService.destroy(chatId, userId);
     }
 
     return null;
   }
 
   private boolean hasAccess(Integer userId, Long chatId, Integer messageId) {
-    if (!sessionService.isAlive(chatId, userId)) {
+    if (!puzzleSessionService.isAlive(chatId, userId)) {
       return false;
     } else {
-      ActivePuzzle puzzle = sessionService.find(chatId, userId);
+      ActivePuzzle puzzle = puzzleSessionService.find(chatId, userId);
       return puzzle.getPuzzleMessageId().equals(messageId);
     }
   }

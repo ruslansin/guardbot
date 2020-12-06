@@ -3,7 +3,7 @@ package com.github.snqlby.guardbot.handler;
 import com.github.snqlby.guardbot.data.ParameterData;
 import com.github.snqlby.guardbot.service.AdminService;
 import com.github.snqlby.guardbot.service.ParameterService;
-import com.github.snqlby.guardbot.service.SessionService;
+import com.github.snqlby.guardbot.service.PuzzleSessionService;
 import com.github.snqlby.guardbot.util.Bot;
 import com.github.snqlby.tgwebhook.AcceptTypes;
 import com.github.snqlby.tgwebhook.Locality;
@@ -26,12 +26,12 @@ import java.util.Objects;
 public class MessageHandler {
 
   private static final Logger LOG = LoggerFactory.getLogger(MessageHandler.class);
-  private final SessionService sessionService;
+  private final PuzzleSessionService puzzleSessionService;
   private final AdminService adminService;
   private final ParameterService parameterService;
 
-  public MessageHandler(SessionService sessionService, AdminService adminService, ParameterService parameterService) {
-    this.sessionService = sessionService;
+  public MessageHandler(PuzzleSessionService puzzleSessionService, AdminService adminService, ParameterService parameterService) {
+    this.puzzleSessionService = puzzleSessionService;
     this.adminService = adminService;
     this.parameterService = parameterService;
   }
@@ -42,7 +42,7 @@ public class MessageHandler {
   public BotApiMethod onMessage(AbsSender bot, Message message) {
     Long chatId = message.getChatId();
     Integer userId = message.getFrom().getId();
-    if (sessionService.isAlive(chatId, userId)) {
+    if (puzzleSessionService.isAlive(chatId, userId)) {
       LOG.info("Remove a message for chat {} for user {}", chatId, userId);
       return Bot.deleteMessage(chatId, message.getMessageId());
     }

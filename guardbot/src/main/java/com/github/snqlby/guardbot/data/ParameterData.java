@@ -7,7 +7,8 @@ public enum ParameterData {
 	MODULE_CAPTCHA_ENABLED("module.captcha.enabled", Boolean.class, "Captcha is active on join.", "<true/false>"),
 	MODULE_DELETE_JOIN_MESSAGE_ENABLED("module.delete_join_message.enabled", Boolean.class, "Remote join messages.", "<true/false>"),
 	MODULE_DELETE_FORWARD_MESSAGE_ENABLED("module.delete_forward_message.enabled", Boolean.class, "Remove forwarded messages.", "<true/false>"),
-	MODULE_DELETE_FORWARD_MESSAGE_FILTER("module.delete_forward_message.filter", String[].class, "Allow forwarded messages with keywords.", "<str1,str2,str3>");
+	MODULE_DELETE_FORWARD_MESSAGE_FILTER("module.delete_forward_message.filter", String[].class, "Allow forwarded messages with keywords.", "<str1,str2,str3>"),
+	CHAT_LOCALE("chat.locale", String.class, "Chat locale for strings.", "<str>");
 
 	private final String name;
 

@@ -2,7 +2,9 @@ package com.github.snqlby.guardbot.puzzle;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.ResourceBundle;
 import java.util.concurrent.ThreadLocalRandom;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.interfaces.BotApiObject;
@@ -37,28 +39,30 @@ public class MinesweeperPuzzle implements Puzzle {
   @Override
   public BotApiMethod<?> nextPuzzle(BotApiObject botApiObject, Map<String, Object> params) {
     if (botApiObject instanceof Message) {
-      return createPuzzleButton(params.get("firstName"));
+      return createPuzzleButton(params);
     } else {
-      return updatePuzzleButton(params.get("firstName"));
+      return updatePuzzleButton(params);
     }
   }
 
-  private SendMessage createPuzzleButton(Object firstName) {
+  private SendMessage createPuzzleButton(Map<String, Object> params) {
     return new SendMessage()
-        .setText(generatePuzzleMessage(firstName))
+        .setText(generatePuzzleMessage(params))
         .setReplyMarkup(new InlineKeyboardMarkup().setKeyboard(generatePuzzle((int) complexity)));
   }
 
-  private EditMessageText updatePuzzleButton(Object firstName) {
+  private EditMessageText updatePuzzleButton(Map<String, Object> params) {
     return new EditMessageText()
-        .setText(generatePuzzleMessage(firstName))
+        .setText(generatePuzzleMessage(params))
         .setReplyMarkup(new InlineKeyboardMarkup().setKeyboard(generatePuzzle((int) complexity)));
   }
 
-  private String generatePuzzleMessage(Object firstName) {
+  private String generatePuzzleMessage(Map<String, Object> params) {
+    Locale locale = new Locale((String) params.get("locale"));
+    ResourceBundle bundle = ResourceBundle.getBundle("strings", locale);
     return String
-        .format("Hello, %s. Let us make sure you are not a bot. *Select the Portal (\uD83C\uDF00)*",
-            firstName);
+        .format(bundle.getString("puzzle.minesweeper.hello.template"),
+            params.get("firstName"), "\uD83C\uDF00");
   }
 
   private List<List<InlineKeyboardButton>> generatePuzzle(int size) {

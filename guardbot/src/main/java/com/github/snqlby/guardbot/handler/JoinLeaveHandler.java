@@ -21,9 +21,10 @@ import com.github.snqlby.tgwebhook.methods.JoinReason;
 import com.github.snqlby.tgwebhook.methods.LeaveMethod;
 import com.github.snqlby.tgwebhook.methods.LeaveReason;
 
-import java.util.List;
+import java.util.Locale;
 import java.util.Map;
-import java.util.Optional;
+import java.util.ResourceBundle;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -32,7 +33,6 @@ import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText;
 import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
 import org.telegram.telegrambots.meta.api.objects.Message;
-import org.telegram.telegrambots.meta.api.objects.MessageEntity;
 import org.telegram.telegrambots.meta.api.objects.User;
 import org.telegram.telegrambots.meta.bots.AbsSender;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
@@ -92,7 +92,11 @@ public class JoinLeaveHandler {
     Bot.muteUser(bot, chatId, userId);
 
     Integer joinMessageId = message.getMessageId();
-    Map<String, Object> params = Map.of("firstName", user.getFirstName());
+    String chatLocale = parameterService.findParameterOrDefault(ParameterData.CHAT_LOCALE, chatId, "en");
+    Map<String, Object> params = Map.of(
+            "firstName", user.getFirstName(),
+            "locale", chatLocale
+    );
     SendMessage puzzleMessage = (SendMessage) puzzle.nextPuzzle(message, params);
     puzzleMessage
             .setChatId(chatId)
@@ -135,7 +139,8 @@ public class JoinLeaveHandler {
     Message originalMessage = message.getReplyToMessage();
     boolean isUserAdmin = adminService.isAdmin(chatId, userId);
     if (!hasAccess(userId, chatId, message.getMessageId()) && !isUserAdmin) {
-      return accessDeniedMessage(query.getId());
+      String chatLocale = parameterService.findParameterOrDefault(ParameterData.CHAT_LOCALE, chatId, "en");
+      return accessDeniedMessage(query.getId(), chatLocale);
     }
 
     User originalUser = originalMessage.getFrom();
@@ -163,7 +168,8 @@ public class JoinLeaveHandler {
     Integer messageId = message.getMessageId();
     boolean isUserAdmin = adminService.isAdmin(chatId, userId);
     if (!hasAccess(userId, chatId, messageId) && !isUserAdmin) {
-      return accessDeniedMessage(query.getId());
+      String chatLocale = parameterService.findParameterOrDefault(ParameterData.CHAT_LOCALE, chatId, "en");
+      return accessDeniedMessage(query.getId(), chatLocale);
     }
 
     User originalUser = originalMessage.getFrom();
@@ -171,14 +177,18 @@ public class JoinLeaveHandler {
 
     if (puzzle.hasNext()) {
       try {
-        Map<String, Object> params = Map.of("firstName", originalUser.getFirstName());
+        String chatLocale = parameterService.findParameterOrDefault(ParameterData.CHAT_LOCALE, chatId, "en");
+        Map<String, Object> params = Map.of(
+                "firstName", originalUser.getFirstName(),
+                "locale", chatLocale
+        );
         EditMessageText newChallenge = (EditMessageText) puzzle.nextPuzzle(query, params);
         newChallenge
             .setChatId(chatId)
             .setMessageId(messageId)
             .enableMarkdown(true);
         bot.execute(newChallenge);
-        return successMessage(query.getId());
+        return successMessage(query.getId(), chatLocale);
       } catch (TelegramApiException e) {
         LOG.warn("Cannot generate a new puzzle, complete it: {}", e.getMessage());
       }
@@ -234,12 +244,16 @@ public class JoinLeaveHandler {
     }
   }
 
-  private BotApiMethod accessDeniedMessage(String queryId) {
-    return Bot.createCallbackMessage(queryId, "It's Not Your Fight Anymore");
+  private BotApiMethod accessDeniedMessage(String queryId, String locale) {
+    Locale chatLocale = new Locale(locale);
+    ResourceBundle bundle = ResourceBundle.getBundle("strings", chatLocale);
+    return Bot.createCallbackMessage(queryId, bundle.getString("puzzle.minesweeper.solve.denied"));
   }
 
-  private BotApiMethod successMessage(String queryId) {
-    return Bot.createCallbackMessage(queryId, "Well Done");
+  private BotApiMethod successMessage(String queryId, String locale) {
+    Locale chatLocale = new Locale(locale);
+    ResourceBundle bundle = ResourceBundle.getBundle("strings", chatLocale);
+    return Bot.createCallbackMessage(queryId, bundle.getString("puzzle.minesweeper.solve.success"));
   }
 
   private void removeMessages(AbsSender bot, long chatId, ActivePuzzle puzzle) {

@@ -5,8 +5,8 @@ import com.github.snqlby.guardbot.database.model.Parameter;
 import com.github.snqlby.guardbot.repository.ParameterRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.util.StringUtils;
 
+import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -57,5 +57,9 @@ public class ParameterService {
 
 		parameterRepository.save(entityParameter);
 		return entityParameter;
+	}
+
+	public List<Parameter> findByChatId(Long chatId) {
+		return parameterRepository.findParametersByChatId(chatId);
 	}
 }

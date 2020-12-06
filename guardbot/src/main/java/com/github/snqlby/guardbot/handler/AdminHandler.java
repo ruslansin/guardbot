@@ -1,6 +1,7 @@
 package com.github.snqlby.guardbot.handler;
 
 import com.github.snqlby.guardbot.data.ParameterData;
+import com.github.snqlby.guardbot.database.model.Parameter;
 import com.github.snqlby.guardbot.service.AdminService;
 import com.github.snqlby.guardbot.service.ParameterService;
 import com.github.snqlby.tgwebhook.AcceptTypes;
@@ -119,6 +120,32 @@ public class AdminHandler {
     }
 
     return new SendMessage(message.getChatId(), joiner.toString()).enableMarkdown(true);
+  }
+
+  /**
+   * Show parameters list.
+   */
+  @CommandMethod(
+          locality = {Locality.GROUP, Locality.SUPERGROUP},
+          command = "/getchatparameters"
+  )
+  public BotApiMethod onChatParametersRequest(AbsSender bot, Message message, List<String> args) {
+    Long chatId = message.getChatId();
+
+    Integer userId = message.getFrom().getId();
+    if (!adminService.isAdmin(chatId, userId)) {
+      return null;
+    }
+
+    LOG.info("Chat parameters were requested by {}", userId);
+
+    List<Parameter> chatParameters = parameterService.findByChatId(chatId);
+    StringJoiner joiner = new StringJoiner(System.lineSeparator());
+    for (Parameter chatParameter : chatParameters) {
+      joiner.add(String.format("*%s* - _%s_", chatParameter.getName(), chatParameter.getValue()));
+    }
+
+    return new SendMessage(userId.longValue(), joiner.toString()).enableMarkdown(true);
   }
 
   /**

@@ -11,6 +11,7 @@ import com.github.snqlby.tgwebhook.methods.CommandMethod;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
+import java.util.StringJoiner;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -96,6 +97,25 @@ public class AdminHandler {
               .enableMarkdown(true);
     }
     return null;
+  }
+
+  /**
+   * Show parameters list.
+   */
+  @CommandMethod(
+          locality = {Locality.PRIVATE},
+          command = "/parameters"
+  )
+  public BotApiMethod onParametersListRequest(AbsSender bot, Message message, List<String> args) {
+
+    LOG.info("Parameters were requested by {}", message.getFrom().getId());
+
+    StringJoiner joiner = new StringJoiner(System.lineSeparator());
+    for (ParameterData parameter : ParameterData.values()) {
+      joiner.add(String.format("%s - %s", parameter.getName(), parameter.getDescription()));
+    }
+
+    return new SendMessage(message.getChatId(), joiner.toString());
   }
 
   /**

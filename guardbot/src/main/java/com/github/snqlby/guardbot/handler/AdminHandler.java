@@ -71,7 +71,7 @@ public class AdminHandler {
    */
   @CommandMethod(
           locality = {Locality.PRIVATE},
-          command = "/parameter"
+          command = "/setparameter"
   )
   public BotApiMethod onParametersRequest(AbsSender bot, Message message, List<String> args) {
     if (args.size() < 3) {
@@ -104,7 +104,7 @@ public class AdminHandler {
    */
   @CommandMethod(
           locality = {Locality.PRIVATE},
-          command = "/parameters"
+          command = "/getparameters"
   )
   public BotApiMethod onParametersListRequest(AbsSender bot, Message message, List<String> args) {
 
@@ -129,7 +129,7 @@ public class AdminHandler {
    */
   @CommandMethod(
           locality = {Locality.PRIVATE},
-          command = "/groups"
+          command = "/getgroups"
   )
   public BotApiMethod onGroupsRequest(AbsSender bot, Message message, List<String> args) {
     Integer userId = message.getFrom().getId();

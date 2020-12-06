@@ -115,7 +115,7 @@ public class AdminHandler {
       if (!parameter.isVisible()) {
         continue;
       }
-      joiner.add(String.format("*%s* - _%s_", parameter.getName(), parameter.getDescription()));
+      joiner.add(String.format("*%s* - %s. Args: _%s_", parameter.getName(), parameter.getDescription(), parameter.getArgs()));
     }
 
     return new SendMessage(message.getChatId(), joiner.toString()).enableMarkdown(true);

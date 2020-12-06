@@ -112,10 +112,10 @@ public class AdminHandler {
 
     StringJoiner joiner = new StringJoiner(System.lineSeparator());
     for (ParameterData parameter : ParameterData.values()) {
-      joiner.add(String.format("%s - %s", parameter.getName(), parameter.getDescription()));
+      joiner.add(String.format("*%s* - _%s_", parameter.getName(), parameter.getDescription()));
     }
 
-    return new SendMessage(message.getChatId(), joiner.toString());
+    return new SendMessage(message.getChatId(), joiner.toString()).enableMarkdown(true);
   }
 
   /**

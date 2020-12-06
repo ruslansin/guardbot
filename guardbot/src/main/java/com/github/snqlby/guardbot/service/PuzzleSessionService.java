@@ -27,7 +27,7 @@ public class PuzzleSessionService {
     int joinMessageId = message.getMessageId();
     String key = key(chatId, userId);
     String solveEmoji = parameterService.findParameterOrDefault(ParameterData.MODULE_MINESWEEPER_SOLVE_SYMBOL, chatId, "\uD83C\uDF00");
-    String banEmoji = parameterService.findParameterOrDefault(ParameterData.MODULE_MINESWEEPER_SOLVE_SYMBOL, chatId, "\uD83D\uDCA3");
+    String banEmoji = parameterService.findParameterOrDefault(ParameterData.MODULE_MINESWEEPER_BAN_SYMBOL, chatId, "\uD83D\uDCA3");
     Puzzle chatPuzzle = new MinesweeperPuzzle(4, solveEmoji, banEmoji);
     ActivePuzzle activePuzzle = new ActivePuzzle(null, userId, joinMessageId, null, chatPuzzle);
     activePuzzles.put(key, activePuzzle);
